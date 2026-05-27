@@ -34,7 +34,7 @@ jobs:
 
       - name: Package build artifacts
         run: |
-          tar -czf docs-api-build.tgz dist package.json package-lock.json prisma
+          tar -czf docs-api-build.tgz dist package.json package-lock.json prisma prisma.config.ts
 
       - name: Configure SSH
         env:
