@@ -7,6 +7,7 @@ export class AppController {
     return {
       ok: true,
       service: 'docs-api',
+      deploymentProbe: 'github-actions-upload-test',
       timestamp: new Date().toISOString(),
     };
   }

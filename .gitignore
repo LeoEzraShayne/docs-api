@@ -37,10 +37,17 @@ lerna-debug.log*
 
 # dotenv environment variable files
 .env
+.env.development
+.env.production
 .env.development.local
 .env.test.local
 .env.production.local
 .env.local
+
+# Local credentials and server keys
+docs/*.pem
+docs/*client_secret*.json
+docs/*密码*.txt
 
 # temp directory
 .temp
