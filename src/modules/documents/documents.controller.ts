@@ -39,9 +39,18 @@ class GenerateDocumentDto {
   inputJson?: Record<string, unknown>;
 
   @IsOptional()
+  @IsIn(['standard', 'simple', 'custom'])
+  generationMode?: 'standard' | 'simple' | 'custom';
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   selectedSheets?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  testViewpoints?: string[];
 
   @IsOptional()
   @IsIn(['standard', 'high'])
@@ -59,6 +68,14 @@ export class DocumentsController {
     @Param('projectId') projectId: string,
   ) {
     return this.documents.list(user.userId, projectId);
+  }
+
+  @Get('tree')
+  tree(
+    @CurrentUser() user: { userId: string },
+    @Param('projectId') projectId: string,
+  ) {
+    return this.documents.tree(user.userId, projectId);
   }
 
   @Get(':type')

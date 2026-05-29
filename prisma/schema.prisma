@@ -67,26 +67,27 @@ enum DocumentSourceType {
 /// 以 email 作为账号唯一标识，Google 与邮箱验证码登录会自动按邮箱合并。
 model User {
   /// 用户主键。
-  id             String          @id @default(cuid())
+  id              String           @id @default(cuid())
   /// 用户邮箱，系统唯一。
-  email          String          @unique
+  email           String           @unique
   /// Google 账号的 sub 标识；同一 Google 账号唯一。
-  googleSub      String?         @unique
+  googleSub       String?          @unique
   /// 创建时间。
-  createdAt      DateTime        @default(now())
+  createdAt       DateTime         @default(now())
   /// 更新时间。
-  updatedAt      DateTime        @updatedAt
+  updatedAt       DateTime         @updatedAt
   /// 用户拥有的项目列表。
-  projects       Project[]
+  projects        Project[]
   /// 用户的额度/套餐状态，一对一。
-  entitlement    Entitlement?
+  entitlement     Entitlement?
   /// 用户历史登录验证码记录。
-  loginCodes     LoginCode[]
+  loginCodes      LoginCode[]
   /// 用户每日 preview 使用统计。
-  previewUsage   PreviewUsage[]
+  previewUsage    PreviewUsage[]
   /// 用户支付记录。
-  payments       Payment[]
-  documentGrants DocumentGrant[]
+  payments        Payment[]
+  documentGrants  DocumentGrant[]
+  documentCredits DocumentCredit[]
 }
 
 /// 邮箱验证码登录记录表。
@@ -203,6 +204,19 @@ model DocumentGrant {
   document             Document     @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
   @@unique([documentId])
+  @@index([userId, expiresAt])
+}
+
+model DocumentCredit {
+  id        String   @id @default(cuid())
+  userId    String
+  quantity  Int
+  source    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId, expiresAt])
 }
 

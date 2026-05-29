@@ -5,7 +5,9 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import ExcelJS from 'exceljs';
+import { DocumentType } from '@prisma/client';
 import { AlertService } from '../alert/alert.service';
+import { DOCUMENT_CONFIG } from '../documents/document-config';
 
 @Injectable()
 export class ExcelService {
@@ -18,6 +20,7 @@ export class ExcelService {
     docTitle: string;
     extractedJson: Record<string, Record<string, unknown>[]>;
     requestId?: string;
+    documentType?: DocumentType;
   }) {
     const workerUrl = this.configService.get<string>('EXCEL_WORKER_URL');
 
@@ -32,6 +35,7 @@ export class ExcelService {
           body: JSON.stringify({
             docTitle: payload.docTitle,
             extractedJson: payload.extractedJson,
+            documentType: payload.documentType,
             templateVersion: 'v2',
           }),
         });
@@ -52,17 +56,16 @@ export class ExcelService {
     }
 
     const workbook = new ExcelJS.Workbook();
-    for (const [sheetName, rows] of Object.entries(payload.extractedJson)) {
-      const sheet = workbook.addWorksheet(sheetName.slice(0, 31));
-      const columns = Array.from(
-        new Set(rows.flatMap((row) => Object.keys(row))),
-      ).map((key) => ({ header: key, key }));
+    const entries = this.orderedEntries(payload);
+    for (const [sheetName, rows, columns] of entries) {
+      const sheet = workbook.addWorksheet(this.safeSheetName(sheetName));
+      let excelColumns = columns.map((key) => ({ header: key, key }));
 
-      if (columns.length === 0) {
-        columns.push({ header: 'message', key: 'message' });
+      if (excelColumns.length === 0) {
+        excelColumns = [{ header: 'message', key: 'message' }];
       }
 
-      sheet.columns = columns;
+      sheet.columns = excelColumns;
       if (rows.length === 0) {
         sheet.addRow({ message: 'No data' });
       } else {
@@ -73,6 +76,31 @@ export class ExcelService {
     const buffer = await workbook.xlsx.writeBuffer();
     await this.alertService.resetFailures('excelWorker');
     return Buffer.from(buffer);
+  }
+
+  private orderedEntries(payload: {
+    extractedJson: Record<string, Record<string, unknown>[]>;
+    documentType?: DocumentType;
+  }): Array<[string, Record<string, unknown>[], string[]]> {
+    if (!payload.documentType) {
+      return Object.entries(payload.extractedJson).map(([name, rows]) => [
+        name,
+        rows,
+        Array.from(new Set(rows.flatMap((row) => Object.keys(row)))),
+      ]);
+    }
+
+    return DOCUMENT_CONFIG[payload.documentType].sheets
+      .filter((sheet) => payload.extractedJson[sheet.name])
+      .map((sheet) => [
+        sheet.name,
+        payload.extractedJson[sheet.name] ?? [],
+        sheet.columns,
+      ]);
+  }
+
+  private safeSheetName(name: string) {
+    return name.replace(/[*?:\\/[\]]/g, '・').slice(0, 31);
   }
 
   async pingWorker() {

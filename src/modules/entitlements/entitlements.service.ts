@@ -38,18 +38,45 @@ export class EntitlementsService {
   }
 
   async addOneshotCredit(userId: string) {
-    return this.addDocumentCredits(userId, 1);
+    return this.addDocumentCredits(userId, 1, 'single_document');
   }
 
-  async addDocumentCredits(userId: string, count: number) {
+  async addDocumentCredits(userId: string, count: number, source = 'single_document') {
     await this.ensureForUser(userId);
-    return this.prisma.entitlement.update({
-      where: { userId },
-      data: {
-        oneshotCredits: { increment: count },
-        planType: PlanType.ONESHOT,
-      },
+    const months = source === 'business_pack' ? 12 : 0;
+    const expiresAt = new Date();
+    if (months) expiresAt.setMonth(expiresAt.getMonth() + months);
+    else expiresAt.setDate(expiresAt.getDate() + 7);
+
+    const [, credit] = await this.prisma.$transaction([
+      this.prisma.entitlement.update({
+        where: { userId },
+        data: { oneshotCredits: { increment: count }, planType: PlanType.ONESHOT },
+      }),
+      this.prisma.documentCredit.create({
+        data: { userId, quantity: count, source, expiresAt },
+      }),
+    ]);
+    return credit;
+  }
+
+  async consumeDocumentCredit(tx: Prisma.TransactionClient, userId: string) {
+    const credit = await tx.documentCredit.findFirst({
+      where: { userId, quantity: { gt: 0 }, expiresAt: { gt: new Date() } },
+      orderBy: { expiresAt: 'asc' },
     });
+    if (!credit) {
+      throw new BadRequestException('No document generation entitlement');
+    }
+    await tx.documentCredit.update({
+      where: { id: credit.id },
+      data: { quantity: { decrement: 1 } },
+    });
+    await tx.entitlement.update({
+      where: { userId },
+      data: { oneshotCredits: { decrement: 1 } },
+    });
+    return credit;
   }
 
   async syncSubscription(userId: string, planType: keyof typeof SUBSCRIPTION_QUOTAS) {

@@ -49,6 +49,19 @@ CREATE TABLE "DocumentGrant" (
     CONSTRAINT "DocumentGrant_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "DocumentCredit" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "quantity" INTEGER NOT NULL,
+    "source" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "DocumentCredit_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "Document_projectId_type_key" ON "Document"("projectId", "type");
 
@@ -70,6 +83,9 @@ CREATE UNIQUE INDEX "DocumentGrant_documentId_key" ON "DocumentGrant"("documentI
 -- CreateIndex
 CREATE INDEX "DocumentGrant_userId_expiresAt_idx" ON "DocumentGrant"("userId", "expiresAt");
 
+-- CreateIndex
+CREATE INDEX "DocumentCredit_userId_expiresAt_idx" ON "DocumentCredit"("userId", "expiresAt");
+
 -- AddForeignKey
 ALTER TABLE "Document" ADD CONSTRAINT "Document_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -84,3 +100,6 @@ ALTER TABLE "DocumentGrant" ADD CONSTRAINT "DocumentGrant_userId_fkey" FOREIGN K
 
 -- AddForeignKey
 ALTER TABLE "DocumentGrant" ADD CONSTRAINT "DocumentGrant_documentId_fkey" FOREIGN KEY ("documentId") REFERENCES "Document"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "DocumentCredit" ADD CONSTRAINT "DocumentCredit_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;

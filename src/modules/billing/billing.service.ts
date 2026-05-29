@@ -34,7 +34,9 @@ export class BillingService {
       line_items: [
         {
           price:
-            this.configService.get<string>('STRIPE_PRICE_ONESHOT') ?? undefined,
+            this.configService.get<string>('STRIPE_PRICE_SINGLE_DOCUMENT') ??
+            this.configService.get<string>('STRIPE_PRICE_ONESHOT') ??
+            undefined,
           quantity: 1,
         },
       ],
@@ -48,7 +50,7 @@ export class BillingService {
 
   async createBusinessPackCheckout(userId: string) {
     if (!this.stripe) {
-      await this.entitlementsService.addDocumentCredits(userId, 78);
+      await this.entitlementsService.addDocumentCredits(userId, 78, 'business_pack');
       return {
         url: `${this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:3000'}/success?mode=stub-business-pack`,
       };
@@ -123,7 +125,11 @@ export class BillingService {
         const userId = session.metadata?.userId;
         if (userId && session.mode === 'payment') {
           const count = session.metadata?.kind === 'business_pack' ? 78 : 1;
-          await this.entitlementsService.addDocumentCredits(userId, count);
+          await this.entitlementsService.addDocumentCredits(
+            userId,
+            count,
+            session.metadata?.kind === 'business_pack' ? 'business_pack' : 'single_document',
+          );
           await this.prisma.payment.upsert({
             where: { stripeSessionId: session.id },
             create: {

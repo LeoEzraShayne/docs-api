@@ -6,12 +6,13 @@ import { LlmService } from '../generate/llm.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { DocumentsController } from './documents.controller';
 import { DocumentGrantsService } from './document-grants.service';
+import { DocumentPromptService } from './document-prompt.service';
 import { DocumentsService } from './documents.service';
 
 @Module({
   imports: [PrismaModule, EntitlementsModule, AlertModule],
   controllers: [DocumentsController],
-  providers: [DocumentsService, DocumentGrantsService, LlmService, ExcelService],
+  providers: [DocumentsService, DocumentGrantsService, DocumentPromptService, LlmService, ExcelService],
   exports: [DocumentsService],
 })
 export class DocumentsModule {}

@@ -1,8 +1,11 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { DocumentType, PlanType, Prisma } from '@prisma/client';
+import { DocumentType, Prisma } from '@prisma/client';
+import { EntitlementsService } from '../entitlements/entitlements.service';
 
 @Injectable()
 export class DocumentGrantsService {
+  constructor(private readonly entitlements: EntitlementsService) {}
+
   async ensureGrant(
     tx: Prisma.TransactionClient,
     userId: string,
@@ -20,19 +23,8 @@ export class DocumentGrantsService {
       return existing;
     }
 
-    const entitlement = await tx.entitlement.findUnique({ where: { userId } });
-    if (!entitlement || entitlement.oneshotCredits < 1) {
-      throw new BadRequestException('No document generation entitlement');
-    }
-
+    await this.entitlements.consumeDocumentCredit(tx, userId);
     const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    await tx.entitlement.update({
-      where: { userId },
-      data: {
-        oneshotCredits: { decrement: 1 },
-        planType: PlanType.ONESHOT,
-      },
-    });
 
     return tx.documentGrant.upsert({
       where: { documentId },
