@@ -38,11 +38,15 @@ export class EntitlementsService {
   }
 
   async addOneshotCredit(userId: string) {
+    return this.addDocumentCredits(userId, 1);
+  }
+
+  async addDocumentCredits(userId: string, count: number) {
     await this.ensureForUser(userId);
     return this.prisma.entitlement.update({
       where: { userId },
       data: {
-        oneshotCredits: { increment: 1 },
+        oneshotCredits: { increment: count },
         planType: PlanType.ONESHOT,
       },
     });
@@ -146,4 +150,5 @@ export class EntitlementsService {
       data: { quotaUsed: { increment: 1 } },
     });
   }
+
 }

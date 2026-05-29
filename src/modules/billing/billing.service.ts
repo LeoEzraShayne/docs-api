@@ -23,6 +23,7 @@ export class BillingService {
 
   async createOneshotCheckout(userId: string) {
     if (!this.stripe) {
+      await this.entitlementsService.addOneshotCredit(userId);
       return {
         url: `${this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:3000'}/success?mode=stub-oneshot`,
       };
@@ -40,6 +41,26 @@ export class BillingService {
       success_url: `${this.configService.get<string>('FRONTEND_URL')}/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${this.configService.get<string>('FRONTEND_URL')}/pricing`,
       metadata: { userId, kind: 'oneshot' },
+    });
+
+    return { url: session.url ?? `${this.configService.get<string>('FRONTEND_URL')}/pricing` };
+  }
+
+  async createBusinessPackCheckout(userId: string) {
+    if (!this.stripe) {
+      await this.entitlementsService.addDocumentCredits(userId, 78);
+      return {
+        url: `${this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:3000'}/success?mode=stub-business-pack`,
+      };
+    }
+
+    const price = this.configService.get<string>('STRIPE_PRICE_BUSINESS_PACK');
+    const session = await this.stripe.checkout.sessions.create({
+      mode: 'payment',
+      line_items: [{ price: price ?? undefined, quantity: 1 }],
+      success_url: `${this.configService.get<string>('FRONTEND_URL')}/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${this.configService.get<string>('FRONTEND_URL')}/pricing`,
+      metadata: { userId, kind: 'business_pack' },
     });
 
     return { url: session.url ?? `${this.configService.get<string>('FRONTEND_URL')}/pricing` };
@@ -101,7 +122,8 @@ export class BillingService {
         const session = event.data.object as Stripe.Checkout.Session;
         const userId = session.metadata?.userId;
         if (userId && session.mode === 'payment') {
-          await this.entitlementsService.addOneshotCredit(userId);
+          const count = session.metadata?.kind === 'business_pack' ? 78 : 1;
+          await this.entitlementsService.addDocumentCredits(userId, count);
           await this.prisma.payment.upsert({
             where: { stripeSessionId: session.id },
             create: {

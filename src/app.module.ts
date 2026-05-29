@@ -8,6 +8,7 @@ import { AlertModule } from './modules/alert/alert.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { DemoModule } from './modules/demo/demo.module';
+import { DocumentsModule } from './modules/documents/documents.module';
 import { EntitlementsModule } from './modules/entitlements/entitlements.module';
 import { GenerateModule } from './modules/generate/generate.module';
 import { PrismaModule } from './modules/prisma/prisma.module';
@@ -31,6 +32,7 @@ import { UsersModule } from './modules/users/users.module';
     AlertModule,
     AuthModule,
     ProjectsModule,
+    DocumentsModule,
     GenerateModule,
     BillingModule,
     DemoModule,

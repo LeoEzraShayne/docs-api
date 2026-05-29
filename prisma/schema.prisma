@@ -6,148 +6,339 @@ datasource db {
   provider = "postgresql"
 }
 
+/// 用户当前可用的产品计划类型。
 enum PlanType {
+  /// 默认免费用户。
   FREE
+  /// 单次购买型额度。
   ONESHOT
+  /// 月付基础版。
   STARTER
+  /// 月付专业版，可用高质量生成。
   PRO
+  /// 企业版，保留更高额度。
   BUSINESS
 }
 
+/// 项目当前所处状态。
 enum ProjectStatus {
+  /// 仅保存草稿，尚未生成结果。
   DRAFT
+  /// 已成功生成至少一个版本。
   READY
+  /// 归档状态，当前版本未启用但保留数据。
   ARCHIVED
 }
 
+/// 登录验证码所属认证来源。
 enum AuthProvider {
+  /// 邮箱验证码登录。
   EMAIL
+  /// Google 第三方登录。
   GOOGLE
 }
 
+/// 支付记录类型。
 enum PaymentType {
+  /// 单次购买。
   ONESHOT
+  /// 订阅付费。
   SUBSCRIPTION
 }
 
-model User {
-  id           String             @id @default(cuid())
-  email        String             @unique
-  googleSub    String?            @unique
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-  projects     Project[]
-  entitlement  Entitlement?
-  loginCodes   LoginCode[]
-  previewUsage PreviewUsage[]
-  payments     Payment[]
+enum DocumentType {
+  REQUIREMENTS
+  BASIC_DESIGN
+  DETAILED_DESIGN
+  UNIT_TEST
+  INTEGRATION_TEST
 }
 
+enum DocumentSourceType {
+  PROJECT
+  REQUIREMENTS_VERSION
+  BASIC_DESIGN_VERSION
+  DETAILED_DESIGN_VERSION
+  DIRECT_INPUT
+  PASTED_DESIGN
+}
+
+/// 系统用户主表。
+/// 以 email 作为账号唯一标识，Google 与邮箱验证码登录会自动按邮箱合并。
+model User {
+  /// 用户主键。
+  id             String          @id @default(cuid())
+  /// 用户邮箱，系统唯一。
+  email          String          @unique
+  /// Google 账号的 sub 标识；同一 Google 账号唯一。
+  googleSub      String?         @unique
+  /// 创建时间。
+  createdAt      DateTime        @default(now())
+  /// 更新时间。
+  updatedAt      DateTime        @updatedAt
+  /// 用户拥有的项目列表。
+  projects       Project[]
+  /// 用户的额度/套餐状态，一对一。
+  entitlement    Entitlement?
+  /// 用户历史登录验证码记录。
+  loginCodes     LoginCode[]
+  /// 用户每日 preview 使用统计。
+  previewUsage   PreviewUsage[]
+  /// 用户支付记录。
+  payments       Payment[]
+  documentGrants DocumentGrant[]
+}
+
+/// 邮箱验证码登录记录表。
+/// 用于验证码发送、有效期校验、防重放和限流统计。
 model LoginCode {
+  /// 验证码记录主键。
   id         String       @id @default(cuid())
+  /// 接收验证码的邮箱。
   email      String
+  /// 六位验证码明文。
   code       String
+  /// 验证码来源，当前主要用于区分 EMAIL/GOOGLE 扩展场景。
   provider   AuthProvider @default(EMAIL)
+  /// 发起请求的 IP，用于限流。
   ip         String?
+  /// 过期时间。
   expiresAt  DateTime
+  /// 实际消费时间；为空表示尚未使用。
   consumedAt DateTime?
+  /// 创建时间。
   createdAt  DateTime     @default(now())
+  /// 关联到的用户；允许为空，便于先发码后建档。
   userId     String?
   user       User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
 
+  /// 用于按邮箱查询最近验证码。
   @@index([email, createdAt])
+  /// 用于按 IP 统计一分钟内请求次数。
   @@index([ip, createdAt])
 }
 
+/// 要件定义项目主表。
+/// 保存用户原始输入、项目状态以及生成记录入口。
 model Project {
-  id              String           @id @default(cuid())
-  userId          String
-  docTitle        String?
-  formFields      Json             @default("{}")
-  minutesText     String           @default("")
-  status          ProjectStatus    @default(DRAFT)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  lastActivityAt  DateTime         @default(now())
-  lastGenerateAt  DateTime?
-  versions        ProjectVersion[]
-  previewUsage    PreviewUsage[]
-  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// 项目主键。
+  id             String           @id @default(cuid())
+  /// 所属用户 ID。
+  userId         String
+  /// 文档/项目标题。
+  docTitle       String?
+  /// 结构化表单输入，按 JSON 保存。
+  formFields     Json             @default("{}")
+  /// 会议纪要/访谈纪要原文。
+  minutesText    String           @default("")
+  /// 当前项目状态。
+  status         ProjectStatus    @default(DRAFT)
+  /// 创建时间。
+  createdAt      DateTime         @default(now())
+  /// 更新时间。
+  updatedAt      DateTime         @updatedAt
+  /// 最近一次业务活动时间，用于后续排序/归档。
+  lastActivityAt DateTime         @default(now())
+  /// 最近一次触发生成时间，用于 30 秒 cooldown。
+  lastGenerateAt DateTime?
+  /// 项目生成出的多个版本。
+  versions       ProjectVersion[]
+  documents      Document[]
+  /// 项目维度的 preview 使用记录。
+  previewUsage   PreviewUsage[]
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  /// 用户下项目列表排序常用索引。
   @@index([userId, updatedAt])
 }
 
-model ProjectVersion {
-  id             String   @id @default(cuid())
+model Document {
+  id             String            @id @default(cuid())
   projectId      String
+  type           DocumentType
+  title          String
+  currentVersion Int               @default(0)
+  lastGenerateAt DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  project        Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  versions       DocumentVersion[]
+  grants         DocumentGrant[]
+
+  @@unique([projectId, type])
+  @@index([projectId, updatedAt])
+}
+
+model DocumentVersion {
+  id                      String             @id @default(cuid())
+  documentId              String
+  versionNo               Int
+  quality                 String             @default("standard")
+  sourceType              DocumentSourceType
+  sourceDocumentVersionId String?
+  inputJson               Json               @default("{}")
+  selectedSheets          Json               @default("[]")
+  extractedJson           Json
+  idempotencyKey          String?
+  createdAt               DateTime           @default(now())
+  document                Document           @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  sourceDocumentVersion   DocumentVersion?   @relation("DocumentVersionSource", fields: [sourceDocumentVersionId], references: [id], onDelete: SetNull)
+  derivedVersions         DocumentVersion[]  @relation("DocumentVersionSource")
+
+  @@unique([documentId, versionNo])
+  @@unique([documentId, idempotencyKey])
+  @@index([sourceDocumentVersionId])
+}
+
+model DocumentGrant {
+  id                   String       @id @default(cuid())
+  userId               String
+  documentId           String
+  documentType         DocumentType
+  remainingGenerations Int          @default(3)
+  expiresAt            DateTime
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+  user                 User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  document             Document     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId])
+  @@index([userId, expiresAt])
+}
+
+/// 项目生成版本表。
+/// 每次 preview/export 成功生成都会落一条版本记录。
+model ProjectVersion {
+  /// 版本主键。
+  id             String   @id @default(cuid())
+  /// 所属项目 ID。
+  projectId      String
+  /// 项目内版本号，从 1 递增。
   versionNo      Int
+  /// 生成质量，当前为 standard/high。
   quality        String
+  /// LLM 抽取后的结构化结果 JSON。
   extractedJson  Json
+  /// 导出幂等键，防止同一导出请求重复扣费/重复生成。
   idempotencyKey String?
+  /// 版本创建时间。
   createdAt      DateTime @default(now())
   project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
+  /// 同一项目内版本号唯一。
   @@unique([projectId, versionNo])
+  /// 同一项目内导出幂等键唯一；PostgreSQL 中 NULL 可重复。
   @@unique([projectId, idempotencyKey])
 }
 
+/// 用户权益与配额表。
+/// 记录套餐类型、剩余额度、订阅周期和 Stripe 客户信息。
 model Entitlement {
+  /// 权益记录主键。
   id                   String    @id @default(cuid())
+  /// 所属用户，一对一唯一。
   userId               String    @unique
+  /// 当前生效套餐。
   planType             PlanType  @default(FREE)
+  /// 单次购买剩余额度。
   oneshotCredits       Int       @default(0)
+  /// 当前订阅周期总额度。
   quotaTotal           Int       @default(0)
+  /// 当前订阅周期已使用额度。
   quotaUsed            Int       @default(0)
+  /// 订阅周期开始时间。
   periodStart          DateTime?
+  /// 订阅周期结束时间。
   periodEnd            DateTime?
+  /// Stripe customer id。
   stripeCustomerId     String?   @unique
+  /// Stripe subscription id。
   stripeSubscriptionId String?   @unique
+  /// 创建时间。
   createdAt            DateTime  @default(now())
+  /// 更新时间。
   updatedAt            DateTime  @updatedAt
   user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+/// 支付流水表。
+/// 用于记录单次购买、订阅付款与 webhook 幂等处理结果。
 model Payment {
-  id                String      @id @default(cuid())
-  userId            String
-  type              PaymentType
-  amountJpy         Int
-  status            String
-  stripeSessionId   String?     @unique
-  stripeInvoiceId   String?     @unique
-  stripeEventId     String?     @unique
-  metadata          Json?
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// 支付记录主键。
+  id              String      @id @default(cuid())
+  /// 所属用户 ID。
+  userId          String
+  /// 支付类型：单次或订阅。
+  type            PaymentType
+  /// 金额（JPY，整数）。
+  amountJpy       Int
+  /// 支付状态，直接保存 Stripe 返回值。
+  status          String
+  /// Stripe Checkout Session ID。
+  stripeSessionId String?     @unique
+  /// Stripe Invoice ID。
+  stripeInvoiceId String?     @unique
+  /// Stripe Event ID，用于 webhook 幂等。
+  stripeEventId   String?     @unique
+  /// 额外上下文信息。
+  metadata        Json?
+  /// 创建时间。
+  createdAt       DateTime    @default(now())
+  /// 更新时间。
+  updatedAt       DateTime    @updatedAt
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  /// 用户支付历史倒序查询常用索引。
   @@index([userId, createdAt])
 }
 
+/// Preview 使用统计表。
+/// 用于按用户/项目/IP/日期控制免费 preview 次数和风控。
 model PreviewUsage {
+  /// 统计记录主键。
   id        String   @id @default(cuid())
+  /// 用户 ID；匿名或特定场景可为空。
   userId    String?
+  /// 项目 ID；按项目统计时使用。
   projectId String?
+  /// IP；按 IP 风控时使用。
   ip        String?
+  /// 统计类型，例如 PROJECT_PREVIEW。
   kind      String
+  /// 东京时区日期键，例如 2026-03-12。
   dateKey   String
+  /// 当日累计次数。
   count     Int      @default(0)
+  /// 创建时间。
   createdAt DateTime @default(now())
+  /// 更新时间。
   updatedAt DateTime @updatedAt
   project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
   user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  /// 防止同一种统计维度重复插入。
   @@unique([kind, dateKey, userId, projectId, ip])
+  /// 按统计类型+日期快速查询。
   @@index([kind, dateKey])
 }
 
+/// 告警状态表。
+/// 记录连续失败次数和 Excel 窗口期统计，供告警/监控使用。
 model AlertState {
-  id                      String   @id
-  excelWorkerFailures     Int      @default(0)
-  openAiFailures          Int      @default(0)
-  stripeFailures          Int      @default(0)
-  excelWindowStartedAt    DateTime?
-  excelWindowTotal        Int      @default(0)
-  excelWindowFailures     Int      @default(0)
-  updatedAt               DateTime @updatedAt
+  /// 告警类型主键，例如 excel/openAi/stripe。
+  id                   String    @id
+  /// Excel worker 连续失败次数。
+  excelWorkerFailures  Int       @default(0)
+  /// OpenAI 连续失败次数。
+  openAiFailures       Int       @default(0)
+  /// Stripe webhook 连续失败次数。
+  stripeFailures       Int       @default(0)
+  /// Excel 成功率统计窗口开始时间。
+  excelWindowStartedAt DateTime?
+  /// Excel 窗口内总请求数。
+  excelWindowTotal     Int       @default(0)
+  /// Excel 窗口内失败数。
+  excelWindowFailures  Int       @default(0)
+  /// 更新时间。
+  updatedAt            DateTime  @updatedAt
 }

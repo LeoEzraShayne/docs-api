@@ -40,6 +40,18 @@ export class BillingController {
     return this.billingService.createOneshotCheckout(user.userId);
   }
 
+  @Post('checkout/single-document')
+  @UseGuards(CookieJwtGuard)
+  checkoutSingleDocument(@CurrentUser() user: { userId: string }) {
+    return this.billingService.createOneshotCheckout(user.userId);
+  }
+
+  @Post('checkout/business-pack')
+  @UseGuards(CookieJwtGuard)
+  checkoutBusinessPack(@CurrentUser() user: { userId: string }) {
+    return this.billingService.createBusinessPackCheckout(user.userId);
+  }
+
   @Post('checkout/subscription')
   @UseGuards(CookieJwtGuard)
   checkoutSubscription(@CurrentUser() user: { userId: string }) {

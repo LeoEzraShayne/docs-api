@@ -151,10 +151,15 @@ export class AuthService {
       throw new BadRequestException('GOOGLE_CLIENT_ID is not configured');
     }
 
-    const ticket = await this.googleClient.verifyIdToken({
-      idToken,
-      audience: clientId,
-    });
+    let ticket;
+    try {
+      ticket = await this.googleClient.verifyIdToken({
+        idToken,
+        audience: clientId,
+      });
+    } catch {
+      throw new UnauthorizedException('Invalid Google token');
+    }
     const payload = ticket.getPayload();
 
     if (!payload?.email || !payload.sub) {
