@@ -7,7 +7,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
   app.use(cookieParser());
   app.enableCors({
-    origin: (process.env.FRONTEND_URL ?? 'http://localhost:3000').split(','),
+    origin: allowedOrigins(),
     credentials: true,
   });
   app.useGlobalPipes(
@@ -20,3 +20,20 @@ async function bootstrap() {
   await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap();
+
+function allowedOrigins() {
+  const configured = (process.env.FRONTEND_URL ?? 'http://localhost:3000')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  return Array.from(
+    new Set([
+      ...configured,
+      'http://localhost:3000',
+      'http://localhost:3010',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:3010',
+    ]),
+  );
+}
