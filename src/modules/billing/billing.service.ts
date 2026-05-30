@@ -25,7 +25,7 @@ export class BillingService {
     if (!this.stripe) {
       await this.entitlementsService.addOneshotCredit(userId);
       return {
-        url: `${this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:3000'}/success?mode=stub-oneshot`,
+        url: `${this.frontendUrl()}/success?mode=stub-oneshot`,
       };
     }
 
@@ -40,8 +40,8 @@ export class BillingService {
           quantity: 1,
         },
       ],
-      success_url: `${this.configService.get<string>('FRONTEND_URL')}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${this.configService.get<string>('FRONTEND_URL')}/pricing`,
+      success_url: `${this.frontendUrl()}/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${this.frontendUrl()}/pricing`,
       metadata: { userId, kind: 'oneshot' },
     });
 
@@ -52,7 +52,7 @@ export class BillingService {
     if (!this.stripe) {
       await this.entitlementsService.addDocumentCredits(userId, 78, 'business_pack');
       return {
-        url: `${this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:3000'}/success?mode=stub-business-pack`,
+        url: `${this.frontendUrl()}/success?mode=stub-business-pack`,
       };
     }
 
@@ -60,8 +60,8 @@ export class BillingService {
     const session = await this.stripe.checkout.sessions.create({
       mode: 'payment',
       line_items: [{ price: price ?? undefined, quantity: 1 }],
-      success_url: `${this.configService.get<string>('FRONTEND_URL')}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${this.configService.get<string>('FRONTEND_URL')}/pricing`,
+      success_url: `${this.frontendUrl()}/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${this.frontendUrl()}/pricing`,
       metadata: { userId, kind: 'business_pack' },
     });
 
@@ -71,7 +71,7 @@ export class BillingService {
   async createSubscriptionCheckout(userId: string) {
     if (!this.stripe) {
       return {
-        url: `${this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:3000'}/success?mode=stub-subscription`,
+        url: `${this.frontendUrl()}/success?mode=stub-subscription`,
       };
     }
 
@@ -81,14 +81,14 @@ export class BillingService {
 
     if (!priceId) {
       return {
-        url: `${this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:3000'}/pricing`,
+        url: `${this.frontendUrl()}/pricing`,
       };
     }
 
     const session = await this.stripe.checkout.sessions.create({
       mode: 'subscription',
-      success_url: `${this.configService.get<string>('FRONTEND_URL')}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${this.configService.get<string>('FRONTEND_URL')}/pricing`,
+      success_url: `${this.frontendUrl()}/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${this.frontendUrl()}/pricing`,
       metadata: { userId, kind: 'subscription' },
       line_items: [{ price: priceId, quantity: 1 }],
     });
@@ -100,13 +100,13 @@ export class BillingService {
     const entitlement = await this.prisma.entitlement.findUnique({ where: { userId } });
     if (!this.stripe || !entitlement?.stripeCustomerId) {
       return {
-        url: `${this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:3000'}/account`,
+        url: `${this.frontendUrl()}/account`,
       };
     }
 
     const session = await this.stripe.billingPortal.sessions.create({
       customer: entitlement.stripeCustomerId,
-      return_url: `${this.configService.get<string>('FRONTEND_URL')}/account`,
+      return_url: `${this.frontendUrl()}/account`,
     });
     return { url: session.url };
   }
@@ -183,5 +183,14 @@ export class BillingService {
   private toAmountJpy(session: Stripe.Checkout.Session) {
     const amount = session.amount_total ?? 0;
     return session.currency === 'jpy' ? amount : Math.round(amount / 100);
+  }
+
+  private frontendUrl() {
+    return (
+      this.configService
+        .get<string>('FRONTEND_URL')
+        ?.split(',')[0]
+        ?.trim() || 'http://localhost:3000'
+    );
   }
 }
