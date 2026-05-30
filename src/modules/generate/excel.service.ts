@@ -1,7 +1,4 @@
-import {
-  Injectable,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import ExcelJS from 'exceljs';
@@ -26,19 +23,23 @@ export class ExcelService {
 
     if (workerUrl) {
       try {
-        const response = await fetch(`${workerUrl.replace(/\/$/, '')}/generate`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-request-id': payload.requestId ?? '',
+        const response = await fetch(
+          `${workerUrl.replace(/\/$/, '')}/generate`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-request-id': payload.requestId ?? '',
+            },
+            body: JSON.stringify({
+              docTitle: payload.docTitle,
+              sheets: payload.extractedJson,
+              extractedJson: payload.extractedJson,
+              documentType: payload.documentType,
+              templateVersion: 'v2',
+            }),
           },
-          body: JSON.stringify({
-            docTitle: payload.docTitle,
-            extractedJson: payload.extractedJson,
-            documentType: payload.documentType,
-            templateVersion: 'v2',
-          }),
-        });
+        );
 
         if (!response.ok) {
           throw new Error(`excel-worker ${response.status}`);

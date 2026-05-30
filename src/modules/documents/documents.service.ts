@@ -1,15 +1,6 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import {
-  DocumentSourceType,
-  DocumentType,
-  Prisma,
-  ProjectStatus,
-} from '@prisma/client';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { DocumentType } from '@prisma/client';
+import { assertGenerationAccess, getOwnedProject } from './document-access';
 import { DOCUMENT_CONFIG } from './document-config';
 import { GenerateInput } from './document-generate.types';
 import { DocumentGrantsService } from './document-grants.service';
@@ -26,6 +17,7 @@ import {
   validateDocumentCooldown,
   validateGenerateInput,
 } from './document-validation';
+import { saveDocumentVersion } from './document-version-writer';
 import { ExcelService } from '../generate/excel.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -39,7 +31,7 @@ export class DocumentsService {
   ) {}
 
   async list(userId: string, projectId: string) {
-    await this.getOwnedProject(userId, projectId);
+    await getOwnedProject(this.prisma, userId, projectId);
     const documents = await this.prisma.document.findMany({
       where: { projectId },
       include: {
@@ -87,7 +79,7 @@ export class DocumentsService {
     validateDocumentCooldown(document.lastGenerateAt);
     const sourceType = input.sourceType ?? defaultSource(type);
     validateGenerateInput(type, sourceType, input);
-    await this.assertGenerationAccess(userId, document.id);
+    await assertGenerationAccess(this.prisma, userId, document.id);
 
     const selectedSheets = selectSheets(
       type,
@@ -117,16 +109,16 @@ export class DocumentsService {
       input.quality ?? 'standard',
     );
     const output = normalizeDocumentOutput(type, selectedSheets, raw);
-    const version = await this.saveVersion(
+    const version = await saveDocumentVersion(this.prisma, this.grants, {
       userId,
-      document.id,
+      documentId: document.id,
       projectId,
       type,
       sourceType,
       input,
       selectedSheets,
-      output.sheets,
-    );
+      extractedJson: output.sheets,
+    });
     const updated = await this.getDocumentById(document.id);
     return toVersionDto(updated, version);
   }
@@ -159,54 +151,12 @@ export class DocumentsService {
     return { filename: `${document.title}-v${versionNo}.xlsx`, buffer };
   }
 
-  private async saveVersion(
-    userId: string,
-    documentId: string,
-    projectId: string,
-    type: DocumentType,
-    sourceType: DocumentSourceType,
-    input: GenerateInput,
-    selectedSheets: string[],
-    extractedJson: Record<string, unknown>,
-  ) {
-    return this.prisma.$transaction(async (tx) => {
-      await this.grants.ensureGrant(tx, userId, documentId, type);
-      await this.grants.consumeGeneration(tx, documentId);
-      const latest = await tx.documentVersion.findFirst({
-        where: { documentId },
-        orderBy: { versionNo: 'desc' },
-      });
-      const created = await tx.documentVersion.create({
-        data: {
-          documentId,
-          versionNo: (latest?.versionNo ?? 0) + 1,
-          quality: input.quality ?? 'standard',
-          sourceType,
-          sourceDocumentVersionId: input.sourceDocumentVersionId,
-          inputJson: (input.inputJson ?? {}) as Prisma.InputJsonValue,
-          selectedSheets: selectedSheets as Prisma.InputJsonValue,
-          extractedJson: extractedJson as Prisma.InputJsonValue,
-          idempotencyKey: input.idempotencyKey,
-        },
-      });
-      await tx.document.update({
-        where: { id: documentId },
-        data: { currentVersion: created.versionNo, lastGenerateAt: new Date() },
-      });
-      await tx.project.update({
-        where: { id: projectId },
-        data: { status: ProjectStatus.READY, lastActivityAt: new Date() },
-      });
-      return created;
-    });
-  }
-
   private async ensureDocument(
     userId: string,
     projectId: string,
     type: DocumentType,
   ) {
-    await this.getOwnedProject(userId, projectId);
+    await getOwnedProject(this.prisma, userId, projectId);
     return this.prisma.document.upsert({
       where: { projectId_type: { projectId, type } },
       create: { projectId, type, title: DOCUMENT_CONFIG[type].title },
@@ -230,37 +180,6 @@ export class DocumentsService {
     });
     if (!document) throw new NotFoundException('Document not found');
     return document;
-  }
-
-  private async getOwnedProject(userId: string, projectId: string) {
-    const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
-    });
-    if (!project) throw new NotFoundException('Project not found');
-    if (project.userId !== userId)
-      throw new ForbiddenException('Project does not belong to user');
-    return project;
-  }
-
-  private async assertGenerationAccess(userId: string, documentId: string) {
-    const now = new Date();
-    const grant = await this.prisma.documentGrant.findUnique({
-      where: { documentId },
-    });
-    if (
-      grant &&
-      grant.userId === userId &&
-      grant.expiresAt > now &&
-      grant.remainingGenerations > 0
-    )
-      return;
-
-    const credit = await this.prisma.documentCredit.findFirst({
-      where: { userId, quantity: { gt: 0 }, expiresAt: { gt: now } },
-      select: { id: true },
-    });
-    if (!credit)
-      throw new BadRequestException('No document generation entitlement');
   }
 
   private findIdempotent(documentId: string, idempotencyKey: string) {

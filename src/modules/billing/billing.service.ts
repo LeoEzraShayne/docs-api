@@ -4,6 +4,7 @@ import Stripe from 'stripe';
 import { AlertService } from '../alert/alert.service';
 import { EntitlementsService } from '../entitlements/entitlements.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { checkoutFrontendUrl, stripeAmountToJpy } from './billing-utils';
 
 @Injectable()
 export class BillingService {
@@ -45,12 +46,16 @@ export class BillingService {
       metadata: { userId, kind: 'oneshot' },
     });
 
-    return { url: session.url ?? `${this.configService.get<string>('FRONTEND_URL')}/pricing` };
+    return { url: session.url ?? `${this.frontendUrl()}/pricing` };
   }
 
   async createBusinessPackCheckout(userId: string) {
     if (!this.stripe) {
-      await this.entitlementsService.addDocumentCredits(userId, 78, 'business_pack');
+      await this.entitlementsService.addDocumentCredits(
+        userId,
+        78,
+        'business_pack',
+      );
       return {
         url: `${this.frontendUrl()}/success?mode=stub-business-pack`,
       };
@@ -65,7 +70,7 @@ export class BillingService {
       metadata: { userId, kind: 'business_pack' },
     });
 
-    return { url: session.url ?? `${this.configService.get<string>('FRONTEND_URL')}/pricing` };
+    return { url: session.url ?? `${this.frontendUrl()}/pricing` };
   }
 
   async createSubscriptionCheckout(userId: string) {
@@ -93,11 +98,13 @@ export class BillingService {
       line_items: [{ price: priceId, quantity: 1 }],
     });
 
-    return { url: session.url ?? `${this.configService.get<string>('FRONTEND_URL')}/pricing` };
+    return { url: session.url ?? `${this.frontendUrl()}/pricing` };
   }
 
   async createPortal(userId: string) {
-    const entitlement = await this.prisma.entitlement.findUnique({ where: { userId } });
+    const entitlement = await this.prisma.entitlement.findUnique({
+      where: { userId },
+    });
     if (!this.stripe || !entitlement?.stripeCustomerId) {
       return {
         url: `${this.frontendUrl()}/account`,
@@ -118,7 +125,11 @@ export class BillingService {
     }
 
     try {
-      const event = this.stripe.webhooks.constructEvent(rawBody, signature, secret);
+      const event = this.stripe.webhooks.constructEvent(
+        rawBody,
+        signature,
+        secret,
+      );
 
       if (event.type === 'checkout.session.completed') {
         const session = event.data.object as Stripe.Checkout.Session;
@@ -128,14 +139,16 @@ export class BillingService {
           await this.entitlementsService.addDocumentCredits(
             userId,
             count,
-            session.metadata?.kind === 'business_pack' ? 'business_pack' : 'single_document',
+            session.metadata?.kind === 'business_pack'
+              ? 'business_pack'
+              : 'single_document',
           );
           await this.prisma.payment.upsert({
             where: { stripeSessionId: session.id },
             create: {
               userId,
               type: 'ONESHOT',
-              amountJpy: this.toAmountJpy(session),
+              amountJpy: stripeAmountToJpy(session),
               status: session.payment_status,
               stripeSessionId: session.id,
               stripeEventId: event.id,
@@ -163,7 +176,10 @@ export class BillingService {
           });
 
           if (entitlement) {
-            await this.entitlementsService.syncSubscription(entitlement.userId, 'STARTER');
+            await this.entitlementsService.syncSubscription(
+              entitlement.userId,
+              'STARTER',
+            );
           }
         }
       }
@@ -180,17 +196,7 @@ export class BillingService {
     }
   }
 
-  private toAmountJpy(session: Stripe.Checkout.Session) {
-    const amount = session.amount_total ?? 0;
-    return session.currency === 'jpy' ? amount : Math.round(amount / 100);
-  }
-
   private frontendUrl() {
-    return (
-      this.configService
-        .get<string>('FRONTEND_URL')
-        ?.split(',')[0]
-        ?.trim() || 'http://localhost:3000'
-    );
+    return checkoutFrontendUrl(this.configService.get<string>('FRONTEND_URL'));
   }
 }
