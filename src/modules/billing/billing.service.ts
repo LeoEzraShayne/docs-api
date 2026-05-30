@@ -135,7 +135,7 @@ export class BillingService {
             create: {
               userId,
               type: 'ONESHOT',
-              amountJpy: (session.amount_total ?? 0) / 100,
+              amountJpy: this.toAmountJpy(session),
               status: session.payment_status,
               stripeSessionId: session.id,
               stripeEventId: event.id,
@@ -178,5 +178,10 @@ export class BillingService {
       );
       throw error;
     }
+  }
+
+  private toAmountJpy(session: Stripe.Checkout.Session) {
+    const amount = session.amount_total ?? 0;
+    return session.currency === 'jpy' ? amount : Math.round(amount / 100);
   }
 }
