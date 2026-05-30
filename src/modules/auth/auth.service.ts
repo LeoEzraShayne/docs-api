@@ -7,6 +7,11 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { OAuth2Client } from 'google-auth-library';
 import { Resend } from 'resend';
+import {
+  VERIFY_CODE_EMAIL_SUBJECT,
+  buildVerifyCodeEmail,
+  buildVerifyCodeText,
+} from '../../common/email/templates/verify-code.email';
 import { TooManyRequestsException } from '../../common/too-many-requests.exception';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
@@ -105,8 +110,9 @@ export class AuthService {
           this.configService.get<string>('MAIL_FROM') ??
           'Docs <no-reply@official.meritledger.org>',
         to: normalizedEmail,
-        subject: '登录验证码',
-        text: `你的验证码是 ${code}，10分钟内有效。`,
+        subject: VERIFY_CODE_EMAIL_SUBJECT,
+        html: buildVerifyCodeEmail(code),
+        text: buildVerifyCodeText(code),
       });
     }
 
