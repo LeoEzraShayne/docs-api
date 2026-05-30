@@ -46,10 +46,7 @@ export class AuthController {
   }
 
   @Post('start')
-  async start(
-    @Body() body: StartAuthDto,
-    @Req() req: RequestWithMeta,
-  ) {
+  async start(@Body() body: StartAuthDto, @Req() req: RequestWithMeta) {
     return this.authService.startEmailLogin(body.email, getRequestIp(req));
   }
 
@@ -59,7 +56,10 @@ export class AuthController {
     @Body() body: VerifyAuthDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const result = await this.authService.verifyEmailCode(body.email, body.code);
+    const result = await this.authService.verifyEmailCode(
+      body.email,
+      body.code,
+    );
     this.attachCookie(res, result.token);
     return result;
   }
@@ -80,7 +80,7 @@ export class AuthController {
   logout(@Res({ passthrough: true }) res: Response) {
     res.clearCookie('auth_token', {
       httpOnly: true,
-      sameSite: 'lax',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       secure: process.env.NODE_ENV === 'production',
       path: '/',
     });
@@ -90,7 +90,7 @@ export class AuthController {
   private attachCookie(res: Response, token: string) {
     res.cookie('auth_token', token, {
       httpOnly: true,
-      sameSite: 'lax',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       secure: process.env.NODE_ENV === 'production',
       maxAge: 30 * 24 * 60 * 60 * 1000,
       path: '/',
