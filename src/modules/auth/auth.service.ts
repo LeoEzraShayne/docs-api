@@ -22,9 +22,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
   ) {
-    this.googleClient = new OAuth2Client(
-      this.configService.get<string>('GOOGLE_CLIENT_ID'),
-    );
+    this.googleClient = new OAuth2Client();
     const resendApiKey = this.configService.get<string>('RESEND_API_KEY');
     this.resend = resendApiKey ? new Resend(resendApiKey) : null;
   }
@@ -146,8 +144,8 @@ export class AuthService {
   }
 
   async loginWithGoogle(idToken: string) {
-    const clientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
-    if (!clientId) {
+    const clientIds = this.getGoogleClientIds();
+    if (clientIds.length === 0) {
       throw new BadRequestException('GOOGLE_CLIENT_ID is not configured');
     }
 
@@ -155,7 +153,7 @@ export class AuthService {
     try {
       ticket = await this.googleClient.verifyIdToken({
         idToken,
-        audience: clientId,
+        audience: clientIds,
       });
     } catch {
       throw new UnauthorizedException('Invalid Google token');
@@ -189,5 +187,25 @@ export class AuthService {
         expiresIn: '30d',
       },
     );
+  }
+
+  private getGoogleClientIds() {
+    return [
+      this.configService.get<string>('GOOGLE_CLIENT_ID'),
+      this.configService.get<string>('NEXT_PUBLIC_GOOGLE_CLIENT_ID'),
+    ]
+      .flatMap((value) => this.parseClientIds(value))
+      .filter((value, index, all) => all.indexOf(value) === index);
+  }
+
+  private parseClientIds(value: string | undefined) {
+    if (!value) {
+      return [];
+    }
+
+    return value
+      .split(',')
+      .map((item) => item.trim().replace(/^['"]|['"]$/g, ''))
+      .filter(Boolean);
   }
 }
