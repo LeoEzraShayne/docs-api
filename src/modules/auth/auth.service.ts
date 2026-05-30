@@ -11,6 +11,9 @@ import { TooManyRequestsException } from '../../common/too-many-requests.excepti
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 
+const PUBLIC_GOOGLE_CLIENT_ID =
+  '692705532429-vln2fhilsu85c1sjia0uftafigsmembn.apps.googleusercontent.com';
+
 @Injectable()
 export class AuthService {
   private readonly googleClient: OAuth2Client;
@@ -193,6 +196,7 @@ export class AuthService {
     return [
       this.configService.get<string>('GOOGLE_CLIENT_ID'),
       this.configService.get<string>('NEXT_PUBLIC_GOOGLE_CLIENT_ID'),
+      PUBLIC_GOOGLE_CLIENT_ID,
     ]
       .flatMap((value) => this.parseClientIds(value))
       .filter((value, index, all) => all.indexOf(value) === index);
