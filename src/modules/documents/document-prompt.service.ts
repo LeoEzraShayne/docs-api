@@ -37,6 +37,8 @@ export class DocumentPromptService {
       `Generate ${DOCUMENT_CONFIG[type].title} as strict JSON.`,
       'Return only {"sheets":{sheetName:rows[]},"metadata":{}}.',
       'Use Japanese user-visible content. Do not add sheets or columns.',
+      'Every selected sheet must contain at least one row and must use exactly the required Japanese column names.',
+      'If source information is missing, keep the relevant cell blank instead of inventing unsupported facts.',
       ...DOCUMENT_PROMPT_RULES[type],
       `Required sheets and columns: ${JSON.stringify(specs)}`,
     ].join('\n');

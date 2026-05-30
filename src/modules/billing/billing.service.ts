@@ -135,14 +135,19 @@ export class BillingService {
         const session = event.data.object as Stripe.Checkout.Session;
         const userId = session.metadata?.userId;
         if (userId && session.mode === 'payment') {
+          const existingPayment = await this.prisma.payment.findUnique({
+            where: { stripeSessionId: session.id },
+          });
           const count = session.metadata?.kind === 'business_pack' ? 78 : 1;
-          await this.entitlementsService.addDocumentCredits(
-            userId,
-            count,
-            session.metadata?.kind === 'business_pack'
-              ? 'business_pack'
-              : 'single_document',
-          );
+          if (!existingPayment) {
+            await this.entitlementsService.addDocumentCredits(
+              userId,
+              count,
+              session.metadata?.kind === 'business_pack'
+                ? 'business_pack'
+                : 'single_document',
+            );
+          }
           await this.prisma.payment.upsert({
             where: { stripeSessionId: session.id },
             create: {

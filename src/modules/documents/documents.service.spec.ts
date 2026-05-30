@@ -3,6 +3,7 @@ import {
   DocumentType,
   ProjectStatus,
 } from '@prisma/client';
+import { DOCUMENT_CONFIG } from './document-config';
 import { DocumentsService } from './documents.service';
 
 const future = () => new Date(Date.now() + 60_000);
@@ -49,7 +50,12 @@ function createService(documentOverrides: Record<string, unknown> = {}) {
         createdAt: new Date('2026-05-30T00:00:00.000Z'),
         extractedJson: {},
       }),
-      findUnique: jest.fn(),
+      findUnique: jest.fn().mockResolvedValue({
+        id: 'version-1',
+        versionNo: 1,
+        createdAt: new Date('2026-05-30T00:00:00.000Z'),
+        extractedJson: { 項目概要: [{ No: 1, 項目: '目的', 内容: '内容' }] },
+      }),
     },
     documentGrant: {
       findUnique: jest.fn().mockResolvedValue(null),
@@ -82,7 +88,7 @@ function createService(documentOverrides: Record<string, unknown> = {}) {
     generate: jest.fn(),
   };
   const excel = {
-    generateWorkbook: jest.fn(),
+    generateWorkbook: jest.fn().mockResolvedValue(Buffer.from('xlsx')),
   };
   return {
     service: new DocumentsService(
@@ -94,6 +100,18 @@ function createService(documentOverrides: Record<string, unknown> = {}) {
     prisma,
     grants,
     prompts,
+    excel,
+  };
+}
+
+function validOutput(type: DocumentType) {
+  return {
+    sheets: Object.fromEntries(
+      DOCUMENT_CONFIG[type].sheets.map((sheet) => [
+        sheet.name,
+        [Object.fromEntries(sheet.columns.map((column) => [column, column]))],
+      ]),
+    ),
   };
 }
 
@@ -142,24 +160,7 @@ describe('DocumentsService', () => {
 
   it('activates grant and consumes one generation only after a valid output is ready', async () => {
     const { service, prisma, grants, prompts } = createService();
-    prompts.generate.mockResolvedValue({
-      sheets: Object.fromEntries(
-        [
-          '項目概要',
-          'スコープ定義',
-          '業務要件',
-          '機能要件一覧',
-          '画面一覧',
-          '画面概要',
-          '権限一覧',
-          'データ項目定義',
-          '外部連携/API一覧',
-          '非機能要件',
-          '業務フロー',
-          '課題・リスク一覧',
-        ].map((name) => [name, [{ 項目: name, 内容: '内容' }]]),
-      ),
-    });
+    prompts.generate.mockResolvedValue(validOutput(DocumentType.REQUIREMENTS));
 
     await service.generate('user-1', 'project-1', DocumentType.REQUIREMENTS, {
       sourceType: DocumentSourceType.PROJECT,
@@ -180,5 +181,53 @@ describe('DocumentsService', () => {
       where: { id: 'project-1' },
       data: { status: ProjectStatus.READY, lastActivityAt: expect.any(Date) },
     });
+  });
+
+  it.each([
+    [DocumentType.REQUIREMENTS, DocumentSourceType.PROJECT],
+    [DocumentType.BASIC_DESIGN, DocumentSourceType.DIRECT_INPUT],
+    [DocumentType.DETAILED_DESIGN, DocumentSourceType.DIRECT_INPUT],
+    [DocumentType.UNIT_TEST, DocumentSourceType.DIRECT_INPUT],
+    [DocumentType.INTEGRATION_TEST, DocumentSourceType.PASTED_DESIGN],
+  ])(
+    'generates and stores a strict workbook payload for %s',
+    async (type, sourceType) => {
+      const { service, prisma, prompts } = createService({
+        type,
+        title: DOCUMENT_CONFIG[type].title,
+      });
+      prompts.generate.mockResolvedValue(validOutput(type));
+
+      await service.generate('user-1', 'project-1', type, {
+        sourceType,
+        inputJson: { overview: 'test' },
+      });
+
+      expect(prisma.documentVersion.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            sourceType,
+            extractedJson: expect.any(Object),
+          }),
+        }),
+      );
+    },
+  );
+
+  it('downloads a version without consuming generation quota', async () => {
+    const { service, grants, excel } = createService();
+
+    const result = await service.download(
+      'user-1',
+      'project-1',
+      DocumentType.REQUIREMENTS,
+      1,
+      'req-1',
+    );
+
+    expect(result.filename).toBe('要件定義書-v1.xlsx');
+    expect(excel.generateWorkbook).toHaveBeenCalled();
+    expect(grants.ensureGrant).not.toHaveBeenCalled();
+    expect(grants.consumeGeneration).not.toHaveBeenCalled();
   });
 });

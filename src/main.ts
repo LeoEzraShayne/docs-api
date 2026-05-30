@@ -9,6 +9,7 @@ async function bootstrap() {
   app.enableCors({
     origin: allowedOrigins(),
     credentials: true,
+    exposedHeaders: ['x-request-id'],
   });
   app.useGlobalPipes(
     new ValidationPipe({
