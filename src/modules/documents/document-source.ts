@@ -30,19 +30,22 @@ export async function resolveSourceVersion(
   const requiredType = SOURCE_TO_TYPE[sourceType];
   if (!requiredType) return null;
   if (!sourceDocumentVersionId) {
-    throw new BadRequestException('Source document version is required');
+    throw new BadRequestException('上流文書バージョンを選択してください。');
   }
 
   const version = await prisma.documentVersion.findUnique({
     where: { id: sourceDocumentVersionId },
     include: { document: { include: { project: true } } },
   });
-  if (!version) throw new NotFoundException('Source document version not found');
+  if (!version)
+    throw new NotFoundException('上流文書バージョンが見つかりません。');
   if (version.document.project.userId !== userId || version.document.projectId !== projectId) {
-    throw new ForbiddenException('Source does not belong to this project');
+    throw new ForbiddenException('上流文書がこの案件に属していません。');
   }
   if (version.document.type !== requiredType) {
-    throw new BadRequestException(`Source must be ${requiredType}`);
+    throw new BadRequestException(
+      `上流文書は ${requiredType} である必要があります。`,
+    );
   }
   return { documentType: version.document.type, versionNo: version.versionNo, data: version.extractedJson };
 }

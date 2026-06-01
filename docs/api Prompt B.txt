@@ -1,0 +1,156 @@
+Prompt B（给 Cursor/Codex：生成 NestJS 后端骨架）
+
+You are building a NestJS backend for a SaaS named 「XX要件定義」.
+Goal: implement authentication (email code), projects CRUD, generate preview/export endpoints, Stripe one-shot checkout + webhook, and entitlements tracking.
+Use TypeScript. Use PostgreSQL with Prisma.
+
+Modules:
+- auth (start/verify)
+- projects (CRUD)
+- generate (LLM extract + versioning + export)
+- billing (stripe checkout + webhook)
+- entitlements (quota/credits)
+- users
+
+API must match exactly:
+- POST   /auth/start {email} -> 200 ok
+- POST   /auth/verify {email, code} -> { token, user:{id,email} }
+
+- POST   /projects -> { id, docTitle, updatedAt }
+- GET    /projects -> [{ id, docTitle, updatedAt, status }]
+- GET    /projects/:id -> { id, docTitle, formFields, minutesText, versions:[{versionNo, createdAt}] }
+- PUT    /projects/:id -> { ... }
+
+- POST   /projects/:id/generate { mode:"preview"|"export", quality:"standard"|"high" } -> 
+  {
+    project:{id, docTitle},
+    versionNo:number,
+    tabs:{ flow:[], screens:[], functions:[], nfr:[], risks_issues:[], glossary:[] },
+    paywall:{ canExport:boolean, remaining:number }
+  }
+
+- GET /projects/:id/versions/:ver/download -> stream xlsx file
+  V1: do not require storing the file; generate on demand using extractedJson + Excel template.
+
+Billing:
+- POST /billing/checkout/oneshot -> { url } (Stripe Checkout for ¥980)
+- POST /billing/checkout/subscription -> { url } (optional v1; implement stubs ok)
+- POST /billing/webhook -> handle checkout.session.completed and invoice.paid etc; update entitlements
+
+Entitlements rules:
+- preview is free, no quota usage
+- export costs 1 credit (oneshotCredits first, else subscription quota)
+- deduct only after successful xlsx generation
+- track remaining in entitlements
+
+LLM:
+- create LlmService with method extractRequirements(input, quality) returning strict JSON (schema validation).
+- For now, stub LLM with deterministic sample JSON if OPENAI_API_KEY missing; but keep code ready to call OpenAI.
+
+Excel export:
+- implement ExcelService that loads template file "要件定義テンプレ_v2.xlsx" and fills sheets using extractedJson.
+- For now, you can implement ExcelService as a stub that returns a small xlsx, but create the structure and method signatures.
+- Provide placeholder integration point to external python excel-worker via HTTP (optional).
+
+Prisma schema:
+- User, Project, ProjectVersion, Entitlement, Payment(optional)
+- store ProjectVersion.extractedJson, quality, createdAt, versionNo
+- store Project.formFields, minutesText, docTitle
+- store Entitlement quota/credits/period
+
+Security:
+- JWT auth guard for /projects and /billing/me and generate/download endpoints
+- validate ownership: project belongs to current user
+
+Env vars:
+DATABASE_URL
+JWT_SECRET
+OPENAI_API_KEY
+STRIPE_SECRET_KEY
+STRIPE_WEBHOOK_SECRET
+STRIPE_PRICE_ONESHOT
+(optional) OPENAI_MODEL_STANDARD, OPENAI_MODEL_HIGH
+
+Deliverable:
+- Full NestJS project with modules/controllers/services, prisma setup, migrations, and a README.
+
+Additional strict backend requirements (must implement):
+
+Auth storage:
+- JWT must be set as httpOnly cookie (Set-Cookie) on login success.
+- All protected routes must use cookie-based auth guard (read cookie token).
+- Do NOT rely on localStorage tokens.
+
+Google + Email auth:
+- Implement POST /auth/google { idToken } -> validate idToken, upsert user, set cookie JWT.
+- Implement email code auth using Resend:
+  - codes are 6-digit numeric, TTL 10 min
+  - rate limit: same email 60s cooldown; same IP max 5/min (enforce in app; also mention Cloudflare)
+  - store codes in DB (V1) with expiry
+
+Free limitations:
+- Enforce max 3 projects per user on POST /projects.
+- Enforce preview limit: 1 preview per day per user (Asia/Tokyo day boundary).
+  - Store preview usage in DB (userId, dateKey "YYYY-MM-DD" in Asia/Tokyo, count)
+  - preview always uses standard model
+
+Preview anti-leak server policy:
+- For mode=preview responses, server must apply redaction:
+  - return only first 5 rows per tab
+  - remove specific columns/fields from JSON objects (FUNCTIONS acceptance/exceptions; NFR target/evidence; RISKS decision_point/countermeasure)
+This must be enforced server-side (not only front-end).
+
+Export & quota:
+- Export consumes 1 credit only after successful xlsx generation.
+- Consumption order: oneshotCredits first, else subscription quota.
+- oneshotCredits never expire.
+- Subscription quota resets on Stripe billing period; webhook drives periodStart/periodEnd and quotaTotal.
+- Safety net: on each export, if now > periodEnd, reset quotaUsed=0 and refresh period.
+- One-shot plan can export standard only; high quality is allowed only for Pro/Business AND mode=export.
+
+Generate cooldown & idempotency:
+- Implement 30-second per-project cooldown for generate requests.
+- Implement idempotencyKey support for export to avoid double charges on retries (e.g., header Idempotency-Key).
+
+Input constraints:
+- minutesText max 20,000 characters; reject with 400 if exceeded.
+
+Data privacy:
+- Store: formFields, minutesText, extractedJson, versions.
+- Provide DELETE /projects/:id hard delete (remove project and versions).
+- Data retention: schedule cleanup for projects with no activity for 180 days (documented; can be a cron job stub in V1).
+
+Logging:
+- Generate x-request-id for each request, include in response header.
+- Log requestId, userId, projectId, versionNo, llm latency, excel latency.
+
+Excel generation:
+- Use a Python excel-worker (FastAPI) for xlsx creation.
+- Nest calls worker with extractedJson + docTitle + templateVersion and streams back the result.
+- If worker is unavailable, return a clear 503 and do NOT deduct credits.
+
+Legal endpoints (optional for backend):
+- Ensure frontend has /terms /privacy /contact routes; backend can be omitted.
+
+
+Implement Demo endpoint (no auth):
+- POST /demo/preview
+  - Uses a server-side fixed sample input (no secrets).
+  - Runs the same extraction pipeline as preview (standard model or stub).
+  - Returns the same response shape as /projects/:id/generate preview, with paywall.canExport=false.
+  - Enforce server-side redaction (5 rows per tab + remove high-value fields).
+  - Rate limit by IP (e.g., 1/min and 3/day).
+
+Implement basic alerting (MVP):
+- Add an AlertService that can send an email via Resend to ADMIN_ALERT_EMAIL.
+- Trigger alerts on:
+  1) excel-worker health check fails 3 times consecutively
+  2) OpenAI errors consecutively 5 times
+  3) Stripe webhook verification/handler errors
+  4) Excel generation error rate over 20% within a rolling 5-minute window and count>=10
+- Include in alert email: timestamp, environment, recent requestIds, error summary, counts.
+- Add a lightweight scheduled job (cron) in NestJS to ping excel-worker /health every 1 minute and update counters.
+- Ensure alerting failures do not crash the server (best-effort).
+Env vars:
+- ADMIN_ALERT_EMAIL=...
+- RESEND_API_KEY=...

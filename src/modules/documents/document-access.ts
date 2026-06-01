@@ -35,9 +35,9 @@ export async function getOwnedProject(
   projectId: string,
 ) {
   const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) throw new NotFoundException('Project not found');
+  if (!project) throw new NotFoundException('案件が見つかりません。');
   if (project.userId !== userId)
-    throw new ForbiddenException('Project does not belong to user');
+    throw new ForbiddenException('この案件にアクセスする権限がありません。');
   return project;
 }
 
@@ -63,5 +63,5 @@ export async function assertGenerationAccess(
     select: { id: true },
   });
   if (!credit)
-    throw new BadRequestException('No document generation entitlement');
+    throw new BadRequestException('文書生成に利用できる購入枠がありません。');
 }

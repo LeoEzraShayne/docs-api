@@ -1,0 +1,413 @@
+# web_Prompt_H.txt
+# Workspace Sidebar / Project Document Tree Fix
+
+You are fixing the Workspace sidebar navigation for the SaaS product 「日语上流文档一键生成」 / 「XX要件定義」.
+
+Do NOT redesign the whole application.
+Do NOT change colors, branding, pricing, billing, authentication, document generation pages, or unrelated layouts.
+Modify ONLY the Workspace sidebar / navigation tree and the routing behavior.
+
+---
+
+# Current Problem
+
+The current Workspace sidebar only shows:
+
+WORKSPACE
+- 案件一覧
+- 新規案件
+- アカウント
+
+But the product specification requires a project-based document tree.
+
+The sidebar must support:
+
+1. Creating a new project quickly.
+2. Viewing the project list.
+3. Opening each project.
+4. Opening five document generation pages under each project.
+5. Showing document versions under each document type.
+6. Refreshing the version tree after a new document version is generated.
+
+---
+
+# Required Sidebar Structure
+
+Important:
+Place 「新規案件」 at the top of the WORKSPACE menu because creating a new project is the primary user action.
+
+Final sidebar structure:
+
+WORKSPACE
+- 新規案件
+- 案件一覧
+- アカウント
+
+PROJECTS
+- {Project Name}
+  - 要件定義書
+    - v1
+    - v2
+    - v3
+  - 基本設計書
+    - v1
+    - v2
+  - 詳細設計書
+    - v1
+    - v2
+  - 単体テスト仕様書
+    - v1
+    - v2
+  - 結合テスト仕様書
+    - v1
+    - v2
+
+Example:
+
+WORKSPACE
+  + 新規案件
+  案件一覧
+  アカウント
+
+PROJECTS
+  ▾ 脳波
+     要件定義書
+       v1
+       v2
+     基本設計書
+     詳細設計書
+     単体テスト仕様書
+     結合テスト仕様書
+
+---
+
+# Sidebar Behavior
+
+## 1. Workspace menu
+
+The top workspace menu must always show:
+
+- 新規案件
+- 案件一覧
+- アカウント
+
+Order must be exactly:
+
+1. 新規案件
+2. 案件一覧
+3. アカウント
+
+Routes:
+
+- 新規案件:
+  /app/new
+
+- 案件一覧:
+  /app
+
+- アカウント:
+  /account
+
+Highlight the active item based on current route.
+
+---
+
+## 2. Project list
+
+Show all user projects under a separate PROJECTS section.
+
+Each project must be collapsible / expandable.
+
+If there are many projects:
+- The project list area should be scrollable.
+- Keep the WORKSPACE menu visible near the top.
+- Do not let the sidebar become unusable.
+
+Each project row should display:
+- Project name
+- Expand / collapse indicator
+
+Clicking the project name should open:
+
+/app/projects/[projectId]
+
+---
+
+## 3. Document type nodes
+
+When a project is expanded, show the five document types:
+
+1. 要件定義書
+2. 基本設計書
+3. 詳細設計書
+4. 単体テスト仕様書
+5. 結合テスト仕様書
+
+Each document type must always be visible even if it has no versions yet.
+
+Routes:
+
+- 要件定義書:
+  /app/projects/[projectId]/documents/requirements
+
+- 基本設計書:
+  /app/projects/[projectId]/documents/basic-design
+
+- 詳細設計書:
+  /app/projects/[projectId]/documents/detailed-design
+
+- 単体テスト仕様書:
+  /app/projects/[projectId]/documents/unit-test
+
+- 結合テスト仕様書:
+  /app/projects/[projectId]/documents/integration-test
+
+Clicking a document type opens the corresponding generation page.
+
+If the document type has no versions:
+- Do not show version nodes.
+- Clicking the document type still opens the generation page.
+
+---
+
+## 4. Version nodes
+
+Under each document type, show existing versions:
+
+- v1
+- v2
+- v3
+
+Version click behavior:
+
+Clicking a version should open the corresponding document page with the selected version.
+
+Use the query parameter:
+
+?version=v1
+
+Examples:
+
+/app/projects/[projectId]/documents/requirements?version=v1
+
+/app/projects/[projectId]/documents/basic-design?version=v2
+
+/app/projects/[projectId]/documents/detailed-design?version=v1
+
+/app/projects/[projectId]/documents/unit-test?version=v3
+
+/app/projects/[projectId]/documents/integration-test?version=v1
+
+Highlight the active version based on current route and query parameter.
+
+---
+
+# Data Loading Rules
+
+The sidebar must load:
+
+1. Project list
+2. Document version list for each project and document type
+
+Use existing APIs if already available.
+
+If APIs are not yet available, create or use the following expected shape:
+
+GET /projects
+
+Returns:
+
+[
+  {
+    "id": "project_id",
+    "name": "脳波",
+    "updatedAt": "2026-05-30T21:33:58Z"
+  }
+]
+
+GET /projects/:projectId/documents
+
+Returns:
+
+[
+  {
+    "type": "REQUIREMENTS",
+    "label": "要件定義書",
+    "versions": [
+      { "versionNo": 1, "label": "v1" },
+      { "versionNo": 2, "label": "v2" }
+    ]
+  },
+  {
+    "type": "BASIC_DESIGN",
+    "label": "基本設計書",
+    "versions": []
+  },
+  {
+    "type": "DETAILED_DESIGN",
+    "label": "詳細設計書",
+    "versions": []
+  },
+  {
+    "type": "UNIT_TEST",
+    "label": "単体テスト仕様書",
+    "versions": []
+  },
+  {
+    "type": "INTEGRATION_TEST",
+    "label": "結合テスト仕様書",
+    "versions": []
+  }
+]
+
+If the backend stores document type names differently, map them as:
+
+REQUIREMENTS -> 要件定義書
+BASIC_DESIGN -> 基本設計書
+DETAILED_DESIGN -> 詳細設計書
+UNIT_TEST -> 単体テスト仕様書
+INTEGRATION_TEST -> 結合テスト仕様書
+
+---
+
+# Refresh Rules
+
+When a document generation succeeds and a new DocumentVersion is created:
+
+1. Refresh the sidebar version tree automatically.
+2. The new version must appear immediately under the correct:
+   - project
+   - document type
+3. Do not require a full page reload.
+4. Do not require the user to manually refresh the browser.
+
+If the existing implementation has an event, callback, or mutation system, use it.
+If not, implement a simple refresh mechanism:
+
+- After successful generation, call the sidebar refresh function.
+- Or invalidate/refetch the project documents query.
+
+---
+
+# Active State Rules
+
+The sidebar must highlight:
+
+1. Current workspace item:
+   - 新規案件
+   - 案件一覧
+   - アカウント
+
+2. Current project:
+   - Based on /app/projects/[projectId]
+
+3. Current document type:
+   - Based on /documents/requirements
+   - /documents/basic-design
+   - /documents/detailed-design
+   - /documents/unit-test
+   - /documents/integration-test
+
+4. Current version:
+   - Based on ?version=v1 / v2 / v3
+
+Active styles must follow the existing design system.
+Do NOT introduce a new visual theme.
+
+---
+
+# UI Style Rules
+
+Keep the current enterprise dark UI style.
+
+Do NOT redesign:
+- Colors
+- Typography
+- Branding
+- Header
+- Footer
+- Pricing
+- Landing page
+- Document pages
+
+Use existing Tailwind classes, components, and layout conventions where possible.
+
+The sidebar should remain:
+- Professional
+- Compact
+- Enterprise-like
+- Easy to scan
+
+Suggested visual hierarchy:
+
+WORKSPACE label
+  新規案件
+  案件一覧
+  アカウント
+
+PROJECTS label
+  ▾ Project Name
+     要件定義書
+       v1
+       v2
+     基本設計書
+     詳細設計書
+     単体テスト仕様書
+     結合テスト仕様書
+
+Use indentation to clearly show hierarchy.
+
+---
+
+# Constraints
+
+Do NOT modify unrelated pages.
+Do NOT change document generation logic.
+Do NOT change payment logic.
+Do NOT change login/auth logic.
+Do NOT change document page forms.
+Do NOT change API contracts unless absolutely necessary.
+
+Only update:
+
+- Workspace layout
+- Sidebar component
+- Project/document/version navigation data loading
+- Active route highlighting
+- Version refresh after successful generation
+- Minor route link behavior needed for the sidebar
+
+---
+
+# Acceptance Criteria
+
+The implementation is correct when:
+
+1. 「新規案件」 appears at the top of the WORKSPACE menu.
+2. 「案件一覧」 appears under 新規案件.
+3. 「アカウント」 appears under 案件一覧.
+4. A PROJECTS section appears under the workspace menu.
+5. Existing projects are displayed under PROJECTS.
+6. Each project can expand/collapse.
+7. Expanded projects show the five document types.
+8. Each document type links to the correct route.
+9. Existing versions appear under each document type.
+10. Version links include ?version=vN.
+11. Current route and selected version are highlighted.
+12. After generating a new document version, the sidebar updates immediately.
+13. The existing dark enterprise UI remains unchanged.
+14. No unrelated pages are modified.
+
+---
+
+# Deliverables
+
+Generate:
+
+- Updated Workspace sidebar implementation
+- Collapsible project tree
+- Document type links
+- Version links
+- Active state highlighting
+- Version refresh mechanism after successful generation
+- Minimal code changes only

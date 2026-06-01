@@ -138,7 +138,7 @@ export class DocumentsService {
     const version = await this.prisma.documentVersion.findUnique({
       where: { documentId_versionNo: { documentId: document.id, versionNo } },
     });
-    if (!version) throw new NotFoundException('Document version not found');
+    if (!version) throw new NotFoundException('文書バージョンが見つかりません。');
     const buffer = await this.excel.generateWorkbook({
       docTitle: document.title,
       documentType: document.type,
@@ -178,7 +178,7 @@ export class DocumentsService {
         grants: true,
       },
     });
-    if (!document) throw new NotFoundException('Document not found');
+    if (!document) throw new NotFoundException('文書が見つかりません。');
     return document;
   }
 

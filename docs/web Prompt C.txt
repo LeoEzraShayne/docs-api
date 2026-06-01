@@ -1,0 +1,539 @@
+# Prompt C（给Codex：生成 要件定義書 页面）
+
+You are building the "Requirements Definition Document" page for the SaaS product 「XX要件定義」.
+
+This page belongs to:
+
+/app/projects/[projectId]/documents/requirements
+
+The overall platform architecture, authentication, billing, project management, document management, and navigation already exist.
+
+Do NOT redesign the platform.
+
+Implement ONLY the Requirements Document page.
+
+---
+
+# Business Concept
+
+The platform structure is:
+
+Project
+└─ Document
+└─ DocumentVersion
+
+Document Types:
+
+* REQUIREMENTS
+* BASIC_DESIGN
+* DETAILED_DESIGN
+* UNIT_TEST
+* INTEGRATION_TEST
+
+This page is ONLY for:
+
+REQUIREMENTS
+
+---
+
+# Navigation Structure
+
+The left sidebar already supports:
+
+Workspace
+
+├── 案件一覧
+├── 新規案件
+
+├── A案件
+│
+├── 要件定義書
+│   ├── v1
+│   ├── v2
+│
+├── 基本設計書
+├── 詳細設計書
+├── 単体テスト仕様書
+└── 結合テスト仕様書
+
+When the user clicks:
+
+A案件 > 要件定義書
+
+Open this page.
+
+---
+
+# Page Goal
+
+User fills requirement information.
+
+System generates a Requirements Definition Excel file.
+
+After generation:
+
+* Automatically download Excel
+* Save a new DocumentVersion
+* Show re-download button
+
+---
+
+# Read Existing Project Information
+
+The following information already exists inside Project.
+
+Display them as read-only.
+
+* Project Name
+* Industry
+* System Type
+* Project Overview
+
+Do NOT ask the user to enter them again.
+
+---
+
+# User Input Fields
+
+# User Input Fields
+
+Required:
+
+## 1. Business Problems to Solve
+
+Textarea
+
+Description:
+
+Describe the current business problems and explain why this system is needed.
+
+Examples:
+
+- Order processing relies on Excel and is prone to errors
+- Inventory management is inefficient and inventory status cannot be tracked in real time
+- Customer information is scattered across multiple systems
+- Approval processes rely on email and are time-consuming
+
+---
+
+## 2. Desired Business Goals
+
+Textarea
+
+Description:
+
+Describe the goals that should be achieved through this system.
+
+Examples:
+
+- Automate order management
+- Improve operational efficiency
+- Reduce manual processing errors
+- Centralize business data management
+
+---
+
+## 3. Main Functions
+
+Textarea
+
+Description:
+
+Describe the key activities that users should be able to perform using the system.
+
+Examples:
+
+- User Login
+- User Management
+- Order Management
+- Inventory Management
+- Sales Reporting
+- Approval Workflow Management
+
+---
+
+Optional:
+
+## 4. User Types
+
+Textarea
+
+Description:
+
+Describe the types of users who will use the system.
+
+Examples:
+
+- Administrator
+- General User
+- Approver
+- Finance Staff
+- Customer Support Staff
+
+---
+
+## 5. External Systems
+
+Textarea
+
+Description:
+
+Describe any external systems that need to integrate with this system.
+
+Examples:
+
+- Payment System
+- ERP System
+- Accounting System
+- Email System
+- Logistics System
+
+---
+
+## 6. Special Requirements
+
+Textarea
+
+Description:
+
+Describe any special business requirements.
+
+Examples:
+
+- Multi-language support
+- Mobile device support
+- Approval required for important operations
+- Operation history must be retained
+- Multi-user collaboration support
+---
+
+# Generation Mode
+
+Radio Group
+
+Default:
+
+● 標準版（推奨）
+
+○ 簡易版
+
+○ カスタム
+
+---
+
+# Standard Version
+
+Generate 12 Sheets
+
+1. 項目概要
+2. スコープ定義
+3. 業務要件
+4. 機能要件一覧
+5. 画面一覧
+6. 画面概要
+7. 権限一覧
+8. データ項目定義
+9. 外部連携/API一覧
+10. 非機能要件
+11. 業務フロー
+12. 課題・リスク一覧
+
+---
+
+# Simple Version
+
+Generate 5 Sheets
+
+1. 項目概要
+2. 機能要件一覧
+3. 画面一覧
+4. データ項目定義
+5. 業務フロー
+
+---
+
+# Custom Version
+
+Allow user to select sheets.
+
+Checkboxes:
+
+□ 項目概要
+□ スコープ定義
+□ 業務要件
+□ 機能要件一覧
+□ 画面一覧
+□ 画面概要
+□ 権限一覧
+□ データ項目定義
+□ 外部連携/API一覧
+□ 非機能要件
+□ 業務フロー
+□ 課題・リスク一覧
+
+At least one sheet must be selected.
+
+---
+
+# Generate Button
+
+Button:
+
+要件定義書を生成する
+
+---
+
+# Generation Flow
+
+When clicked:
+
+1. Validate required fields.
+
+2. Create generation request.
+
+3. Show progress UI.
+
+Disable button during generation.
+
+---
+
+# Progress UI
+
+Show progress bar.
+
+Status messages:
+
+* 入力内容を解析しています
+* 要件を整理しています
+* Excelを生成しています
+* 完了しました
+
+Progress:
+
+0% → 100%
+
+---
+
+# Success Flow
+
+When generation succeeds:
+
+1. Automatically download Excel
+
+2. Show message:
+
+要件定義書の生成が完了しました。
+
+3. Show button:
+
+Excelを再ダウンロード
+
+4. Create DocumentVersion
+
+Examples:
+
+v1
+v2
+v3
+
+5. Refresh version tree in sidebar
+
+---
+
+# Download Rules
+
+Re-download does NOT consume generation count.
+
+Only successful generation creates a new version.
+
+---
+
+# Error Handling
+
+Display error card.
+
+Show:
+
+* Error message
+* Request ID
+
+Allow retry.
+
+---
+
+# UI Style
+
+Use the same style already defined in Prompt A.
+
+Do NOT redesign colors.
+
+Do NOT redesign layout.
+
+Use existing design system.
+
+Keep enterprise software style.
+
+Focus on:
+
+Input → Generate → Download
+
+Simple and professional.
+
+---
+
+# Deliverables
+
+Generate:
+
+* Full page implementation
+* Form validation
+* Generation mode selector
+* Progress component
+* Success state
+* Error state
+* Auto-download logic
+* Re-download logic
+* Version refresh integration
+
+Do not modify unrelated pages.
+
+# Requirements Definition Sheet Level Rules
+
+The Requirements Document is a business-level document.
+
+Do NOT generate implementation-level content.
+
+Do NOT generate detailed technical design.
+
+The purpose is to define WHAT the system needs.
+
+Not HOW the system will be implemented.
+
+---
+
+API Sheet Rules
+
+The API sheet is only for requirement definition.
+
+Columns:
+
+- API Name
+- Purpose
+- Caller
+- Callee
+- Business Description
+
+Examples:
+
+Create Order API
+
+Purpose:
+Create customer order
+
+Caller:
+Web Frontend
+
+Callee:
+Backend System
+
+Business Description:
+Create a new order and return order number
+
+Do NOT generate:
+
+- URL
+- Request JSON
+- Response JSON
+- Error Codes
+- Database Logic
+
+These belong to Basic Design or Detailed Design.
+
+---
+
+Screen Sheet Rules
+
+Only define:
+
+- Screen ID
+- Screen Name
+- Purpose
+- Main Functions
+
+Do NOT generate:
+
+- Layout Design
+- Component Design
+- Field Validation Rules
+
+---
+
+Database Sheet Rules
+
+Only define:
+
+- Entity Name
+- Purpose
+- Main Data Items
+
+Do NOT generate:
+
+- Data Types
+- Length
+- PK/FK Design
+- Index Design
+
+---
+
+Permission Sheet Rules
+
+Only define:
+
+- Role Name
+- Accessible Functions
+
+Do NOT generate detailed permission matrix.
+
+---
+
+Business Flow Sheet Rules
+
+Generate business-level flow.
+
+Do NOT generate system sequence diagrams.
+
+---
+
+Non Functional Requirement Sheet Rules
+
+Generate:
+
+- Security
+- Performance
+- Availability
+- Audit
+- Backup
+
+at requirement level only.
+
+Do NOT generate implementation details.
+# Document Dependency Rules
+
+Requirements Document is the first document in the generation chain.
+
+It does NOT support upstream document selection.
+
+Input source is always:
+
+Project Information
++
+Requirements Input Form
+
+The generated Requirements Document may later be used as an upstream source for:
+
+- Basic Design
+- Detailed Design
+- Unit Test Specification
+- Integration Test Specification
+
+Requirements Document is the root document of the document generation workflow.

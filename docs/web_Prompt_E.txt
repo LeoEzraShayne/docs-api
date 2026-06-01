@@ -1,0 +1,351 @@
+# Prompt E（给 Codex：生成 詳細設計書 页面）
+
+You are building the "Detailed Design Document" page for the SaaS product 「XX要件定義」.
+
+This page belongs to:
+
+/app/projects/[projectId]/documents/detailed-design
+
+Implement ONLY the Detailed Design page.
+
+Do NOT redesign the platform.
+
+Use the same UI style, layout, authentication, billing, progress bar, download mechanism, version management, and generation workflow already implemented in Prompt C and Prompt D.
+
+---
+
+# Business Concept
+
+Document Type:
+
+DETAILED_DESIGN
+
+The generated result is:
+
+詳細設計書.xlsx
+
+---
+
+# Navigation Structure
+
+Workspace
+
+├── 案件一覧
+├── 新規案件
+
+├── A案件
+│
+├── 要件定義書
+├── 基本設計書
+├── 詳細設計書
+│   ├── v1
+│   ├── v2
+│
+├── 単体テスト仕様書
+└── 結合テスト仕様書
+
+---
+
+# Input Source
+
+User must choose source.
+
+Required:
+
+● 基本設計書
+
+○ 直接入力
+
+---
+
+# If Source = 基本設計書
+
+Show:
+
+基本設計書バージョン
+
+○ v1
+○ v2
+○ v3
+
+Load selected Basic Design Document.
+
+Use it as AI input.
+
+---
+
+# If Source = 直接入力
+
+Show:
+
+Required:
+
+1. 解決したい課題
+
+2. 実現したいこと
+
+3. 主な機能
+
+Optional:
+
+4. 利用者
+
+5. 外部連携システム
+
+6. 特別な要件
+
+---
+
+# Additional Detailed Design Inputs
+
+Required:
+
+## 1. データ管理詳細要件
+
+Examples:
+
+- 利用者情報を長期保存する
+- 削除データの履歴を保持する
+- 操作履歴を記録する
+
+---
+
+## 2. API詳細要件
+
+Examples:
+
+- 外部システムと連携する
+- 認証が必要
+- エラー時にメッセージを返す
+
+---
+
+## 3. 画面詳細要件
+
+Examples:
+
+- 検索機能
+- ページング
+- CSV出力
+- 一括操作
+
+---
+
+## 4. 入力チェック要件
+
+Examples:
+
+- 必須入力
+- メール形式チェック
+- 最大文字数チェック
+- 数値範囲チェック
+
+---
+
+Optional:
+
+## 5. エラー・メッセージ要件
+
+Examples:
+
+- 保存成功メッセージ
+- 削除確認メッセージ
+- 入力エラーメッセージ
+
+---
+
+## 6. 特別実装要件
+
+Examples:
+
+- 承認フロー
+- 排他制御
+- 多言語対応
+- 履歴管理
+
+---
+
+# Generation Mode
+
+● 標準版（推奨）
+
+○ カスタム
+
+---
+
+# Standard Version
+
+Generate 9 Sheets.
+
+---
+
+Sheet1
+
+テーブル詳細設計
+
+Columns:
+
+| No | テーブル論理名 | テーブル物理名 | 用途 | 主な処理 | 備考 |
+
+---
+
+Sheet2
+
+テーブル項目定義
+
+Columns:
+
+| No | テーブル論理名 | テーブル物理名 | 項目論理名 | 項目物理名 | データ型 | 必須 | 説明 |
+
+---
+
+Sheet3
+
+API項目定義
+
+Columns:
+
+| No | API ID | 区分 | 項目論理名 | 項目物理名 | データ型 | 必須 | 説明 | サンプル値 |
+
+区分:
+
+- Request
+- Response
+
+---
+
+Sheet4
+
+API詳細設計
+
+Columns:
+
+| No | API名 | API ID | URL | Method | Request JSON | Response JSON | 処理概要 |
+
+---
+
+Sheet5
+
+画面項目設計
+
+Columns:
+
+| No | 画面名 | 画面ID | 項目論理名 | 項目物理名 | 項目種別 | 必須 | 活性条件 | 説明 |
+
+---
+
+Sheet6
+
+入力チェック設計
+
+Columns:
+
+| No | 画面名 | 項目論理名 | 項目物理名 | チェック内容 | エラーメッセージ |
+
+---
+
+Sheet7
+
+画面処理設計
+
+Columns:
+
+| No | 画面名 | 操作 | 処理内容 | 呼出API |
+
+---
+
+Sheet8
+
+エラー設計
+
+Columns:
+
+| No | エラーコード | エラー名 | エラー内容 | 処理方法 |
+
+---
+
+Sheet9
+
+メッセージ設計
+
+Columns:
+
+| No | メッセージID | メッセージ内容 | 表示タイミング |
+
+---
+
+# Custom Mode
+
+Allow users to select any sheets from the 9 standard sheets.
+
+At least one sheet must be selected.
+
+---
+
+# Generation Flow
+
+Input
+↓
+Generate
+↓
+Progress Bar
+↓
+Auto Download Excel
+↓
+Create Version
+↓
+Show Re-download Button
+
+---
+
+# Progress Messages
+
+- 詳細設計を分析しています
+- 項目定義を生成しています
+- Excelを生成しています
+- 完了しました
+
+---
+
+# Download Rules
+
+Successful generation:
+
+- Automatically download xlsx
+- Create new version
+
+Re-download:
+
+- Does not consume generation count
+
+---
+
+# Version Rules
+
+Generate:
+
+v1
+v2
+v3
+
+Refresh sidebar version tree automatically.
+
+---
+
+# Deliverables
+
+Generate:
+
+- Full page implementation
+- Form validation
+- Source selector
+- Version selector
+- Sheet selector
+- Progress component
+- Success state
+- Error state
+- Auto-download logic
+- Re-download logic
+- Version refresh integration
+
+Do not modify unrelated pages.

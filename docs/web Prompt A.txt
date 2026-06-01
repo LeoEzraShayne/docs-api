@@ -1,0 +1,125 @@
+
+Prompt A（给 Cursor/Codex：生成 Next.js + Tailwind 前端工程）
+
+You are building a production-ready Next.js (App Router) + Tailwind SaaS frontend for a product named 「XX要件定義」.
+Goal: implement real pages, routes, forms, auth state, API client, Stripe checkout redirect, and a preview UI with tabbed tables.
+No mock UI-only prototypes; everything should call the backend API via fetch.
+
+Tech:
+- Next.js 14+ App Router
+- Tailwind CSS
+- TypeScript
+- No heavy UI libraries. Use simple components.
+- Use environment variable NEXT_PUBLIC_API_BASE_URL for backend base URL.
+
+Pages (routes):
+1) /            (Landing)
+2) /pricing     (Pricing)
+3) /login       (Email login)
+4) /app         (Project list)
+5) /app/new     (Create project + input form)
+6) /app/projects/[id] (Project detail + version list)
+7) /app/projects/[id]/preview?ver=n (Tabs preview: FLOW/SCREENS/FUNCTIONS/NFR/RISKS_ISSUES/GLOSSARY)
+8) /account     (Entitlements/remaining + stripe portal link)
+9) /success     (after stripe success)
+
+Design style:
+- Minimal Japanese enterprise tool feel.
+- Colors: background #0B1220, surface #111A2E, primary #3B82F6, border #24304A, text #E5E7EB, muted #9CA3AF.
+- Use Noto Sans JP (or default system if not available).
+
+Auth:
+- Store JWT token in httpOnly cookie if possible; if not, use localStorage with a minimal auth wrapper.
+- Implement a simple auth context and route guard for /app and /account.
+- Login flow:
+  - POST /auth/start {email}
+  - POST /auth/verify {email, code}
+  - On success store token and redirect to /app
+
+API Contract (must match):
+- POST   /projects -> { id, docTitle, updatedAt }
+- GET    /projects -> [{ id, docTitle, updatedAt, status }]
+- GET    /projects/:id -> { id, docTitle, formFields, minutesText, versions:[{versionNo, createdAt}] }
+- PUT    /projects/:id -> update project
+- POST   /projects/:id/generate body { mode:"preview"|"export", quality:"standard"|"high" }
+  - returns:
+    {
+      project:{id, docTitle},
+      versionNo:number,
+      tabs:{
+        flow: any[],
+        screens: any[],
+        functions: any[],
+        nfr: any[],
+        risks_issues: any[],
+        glossary: any[]
+      },
+      paywall:{ canExport:boolean, remaining:number }
+    }
+- GET    /projects/:id/versions/:ver/download -> returns xlsx file stream (Content-Disposition attachment)
+- POST   /billing/checkout/oneshot -> { url }
+- POST   /billing/checkout/subscription -> { url }
+- GET    /billing/me -> { planType, remaining, periodEnd }
+- GET    /billing/portal -> { url } (optional; if not implemented, link to instructions)
+
+Frontend behavior:
+- Landing CTA “¥980で1本作る” should go to /login if not logged in, else /app/new.
+- /app/new:
+  - Form fields per PRD: title optional, industry, systemType, purpose, background, goals, in/out scope, assumptions, constraints, rolesText, minutesText.
+  - Buttons:
+    - “プレビュー生成（無料）” => call generate(mode=preview, quality=standard) then redirect to preview page
+    - “購入してExcel生成（有料）” => if paywall not allowed, call /billing/checkout/oneshot and redirect to stripe url; after success, user returns to /success and can download from project page.
+- Preview page:
+  - Show tabs; each tab renders table with columns derived from object keys (simple).
+  - Show top bar with “Excelダウンロード” button.
+    - If paywall.canExport false -> show “購入してダウンロード” button linking to checkout.
+    - If canExport true -> trigger download by navigating to /projects/:id/versions/:ver/download using full API base URL and auth token.
+
+Code requirements:
+- Provide a reusable apiClient with baseURL, auth header, error handling.
+- Use server components where appropriate but keep API calls client-side for simplicity.
+- Provide clean component structure: components/Button, components/Card, components/Tabs, components/Table.
+- Provide README with run instructions and required env vars.
+
+Deliverable:
+- Create the full Next.js project files with Tailwind configured and working.
+
+Additional strict requirements (must implement):
+
+Auth & token storage:
+- Use httpOnly cookie-based auth if possible (recommended). Avoid localStorage.
+- Provide a thin auth helper that sends credentials with fetch (credentials: "include") and handles 401 by redirecting to /login.
+
+Free limits & preview anti-abuse UI:
+- Free users can create at most 3 projects. If limit reached, show a paywall CTA to /pricing.
+- Preview is limited to 1 per day per user, reset at Asia/Tokyo 00:00. If exceeded, show message and CTA to purchase.
+- Preview page must enforce anti-leak display:
+  - Only show first 5 rows per tab
+  - Hide high-value columns for FUNCTIONS (acceptance, exceptions), NFR (target, evidence), RISKS_ISSUES (countermeasure, decision_point)
+  - Display a visible "Preview" watermark label in the UI
+
+Export model policy:
+- In UI, allow "quality=high" option ONLY if paywall indicates Pro/Business and mode=export; preview always standard.
+- One-shot purchase enables export standard only (no high toggle).
+
+Operational UX:
+- Add a requestId in error UI (read from response header x-request-id or JSON field requestId).
+- Add cooldown: disable generate button for 30 seconds after a generate request for same project.
+- Input length: if minutesText exceeds 20,000 chars, show client-side validation error.
+
+Legal & support:
+- Add footer links: /terms /privacy /contact
+- Contact page provides a form or an email address.
+
+Pricing display:
+- Show tax-inclusive prices (税込) in Pricing page.
+
+Deliverable:
+- Ensure these rules are implemented in UI logic, not only documented.
+
+Add a public demo flow (no login):
+- Add a "デモで試す" button on Landing that navigates to /demo.
+- Create a new route /demo that calls POST /demo/preview and renders the same Preview UI (Tabs + tables).
+- Demo must never allow xlsx download; show CTA "¥980で作る" -> if not logged in go /login else /app/new.
+- Demo UI must apply the same preview restrictions (only 5 rows per tab, hide high-value columns, show Preview watermark).
+- Add rate-limit friendly UX: if demo API returns 429, show "しばらくしてから再度お試しください" message.

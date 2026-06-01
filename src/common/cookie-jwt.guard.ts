@@ -25,7 +25,7 @@ export class CookieJwtGuard implements CanActivate {
     const token = req.cookies?.auth_token;
 
     if (!token) {
-      throw new UnauthorizedException('Missing auth cookie');
+      throw new UnauthorizedException('ログインが必要です。');
     }
 
     try {
@@ -40,7 +40,7 @@ export class CookieJwtGuard implements CanActivate {
 
       return true;
     } catch {
-      throw new UnauthorizedException('Invalid auth cookie');
+      throw new UnauthorizedException('ログイン状態を確認できません。');
     }
   }
 }

@@ -52,7 +52,7 @@ export class ExcelService {
           payload.requestId ? [payload.requestId] : [],
           error instanceof Error ? error.message : 'excel worker error',
         );
-        throw new ServiceUnavailableException('Excel worker unavailable');
+        throw new ServiceUnavailableException('Excel生成サービスを利用できません。');
       }
     }
 

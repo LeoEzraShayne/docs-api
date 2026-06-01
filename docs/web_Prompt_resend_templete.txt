@@ -1,0 +1,122 @@
+You are working on the existing Docs web project.
+
+Goal:
+Improve the Resend verification-code email. The current email is too plain and ugly. Implement a clean, professional, email-client-safe login verification email for the Docs product.
+
+Important:
+Do NOT use the Resend Dashboard Template feature for now.
+Implement the email template directly in the backend code and pass it to Resend through the `html` field when sending the email.
+Keep the existing login / verification-code flow unchanged.
+
+Context:
+- Product name: Docs
+- Email type: login verification code
+- Main language for the email content: Japanese
+- Verification code validity: 10 minutes
+- The email should look like a real SaaS transactional email, not a default plain text message.
+
+Required output:
+1. Find the existing Resend email sending logic in the project.
+2. Create or update a reusable email template function for login verification codes.
+3. Use the new HTML template when sending the verification-code email.
+4. Also provide a plain text fallback through the `text` field.
+5. Keep environment variables, Resend API key usage, and existing auth logic unchanged.
+
+Suggested file structure if no existing structure is present:
+- src/email/templates/verify-code.email.ts
+- or src/common/email/templates/verify-code.email.ts
+- or the closest existing email/template folder in the current project.
+
+Template function requirement:
+Create a function similar to:
+
+```ts
+export function buildVerifyCodeEmail(code: string) {
+  return `...html...`;
+}
+
+export function buildVerifyCodeText(code: string) {
+  return `Docsのログイン認証コードは ${code} です。10分間有効です。`;
+}
+```
+
+Email subject:
+```text
+【Docs】ログイン認証コード
+```
+
+Email copy:
+Use Japanese text like this:
+
+- ログイン認証コード
+- Docsへのログインに使用する認証コードをお送りします。
+- 認証コード
+- このコードは10分間有効です。
+- 心当たりがない場合は、このメールを破棄してください。
+- このメールは自動送信されています。返信はできません。
+
+Design requirements:
+- Clean SaaS style
+- White card on light gray background
+- Centered layout
+- Max width around 520px to 600px
+- Rounded card corners
+- Soft shadow
+- Product mark: a simple dark square or rounded square with the letter "D"
+- Large verification code in the center
+- The code should be visually prominent, for example 32px to 40px font size
+- Use letter spacing for the code
+- Show the 10-minute expiry clearly
+- Add a small security notice
+- Add a small footer
+- Mobile responsive
+
+Email HTML compatibility requirements:
+- Use inline CSS only.
+- Do not rely on external CSS files.
+- Do not rely on Tailwind classes.
+- Do not load external fonts.
+- Do not use JavaScript.
+- Do not use images unless they already exist in the project and are safe for email.
+- Prefer simple `<table>` or conservative `<div>` layout compatible with Gmail, Apple Mail, Outlook, and mobile clients.
+- Use safe fallback fonts such as `-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif`.
+
+Security / correctness requirements:
+- Do not change how the verification code is generated.
+- Do not change the expiration logic.
+- Do not log verification codes.
+- Do not expose the Resend API key.
+- Do not hardcode secrets.
+- If the code is not guaranteed to be numeric, safely escape dynamic values inserted into HTML.
+- Keep the email from address configurable through the existing environment variable if one already exists.
+- Do not create a new payment, account, or marketing email flow.
+
+Expected Resend usage:
+The final sending logic should look conceptually like this, adapted to the project’s actual code style:
+
+```ts
+await resend.emails.send({
+  from: process.env.RESEND_FROM || 'Docs <noreply@docs.meritledger.org>',
+  to: email,
+  subject: '【Docs】ログイン認証コード',
+  html: buildVerifyCodeEmail(code),
+  text: buildVerifyCodeText(code),
+});
+```
+
+Do not blindly overwrite the project structure. First inspect the existing files, then modify the smallest necessary set of files.
+
+Acceptance criteria:
+- The verification-code email uses the new beautiful HTML design.
+- The email is fully Japanese, except for the product name "Docs".
+- The plaintext fallback exists.
+- Existing login verification still works.
+- TypeScript compiles without errors.
+- No Chinese copy remains in the verification email.
+- No unrelated files or flows are changed.
+- No Resend Dashboard Template integration is added.
+
+After implementation:
+- Show the changed file list.
+- Show the final send-email function or service method.
+- Show how to test locally, for example by requesting a verification code from the login page or API endpoint.

@@ -6,7 +6,7 @@ import { selectSheets } from './document-output';
 
 export function requireDocumentType(value: string) {
   const type = parseDocumentType(value);
-  if (!type) throw new BadRequestException('Invalid document type');
+  if (!type) throw new BadRequestException('文書種別が正しくありません。');
   return type;
 }
 
@@ -16,7 +16,7 @@ export function validateGenerateInput(
   input: GenerateInput,
 ) {
   if (!DOCUMENT_CONFIG[type].sources.includes(sourceType)) {
-    throw new BadRequestException('Invalid source type');
+    throw new BadRequestException('入力ソースが正しくありません。');
   }
 
   const limit =
@@ -24,13 +24,13 @@ export function validateGenerateInput(
       ? 10_000
       : 20_000;
   if (JSON.stringify(input.inputJson ?? {}).length > limit) {
-    throw new BadRequestException('Input exceeds maximum length');
+    throw new BadRequestException('入力内容が最大文字数を超えています。');
   }
   selectSheets(type, input.generationMode, input.selectedSheets);
 }
 
 export function validateDocumentCooldown(lastGenerateAt: Date | null) {
   if (lastGenerateAt && Date.now() - lastGenerateAt.getTime() < 30_000) {
-    throw new BadRequestException('Generate cooldown: 30 seconds');
+    throw new BadRequestException('30秒待ってから再実行してください。');
   }
 }

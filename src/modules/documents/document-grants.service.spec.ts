@@ -51,6 +51,7 @@ describe('DocumentGrantsService', () => {
     expect(entitlements.consumeDocumentCredit).toHaveBeenCalledWith(
       tx,
       'user-1',
+      DocumentType.REQUIREMENTS,
     );
     expect(tx.documentGrant.upsert).toHaveBeenCalledWith(
       expect.objectContaining({

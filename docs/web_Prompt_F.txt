@@ -1,0 +1,354 @@
+# Prompt F（给 Codex：生成 単体テスト仕様書 页面）
+
+You are building the "Unit Test Specification" page for the SaaS product 「XX要件定義」.
+
+This page belongs to:
+
+/app/projects/[projectId]/documents/unit-test
+
+Implement ONLY the Unit Test Specification page.
+
+Do NOT redesign the platform.
+
+Use the same UI style, layout, authentication, billing, progress bar, download mechanism, version management, and generation workflow already implemented in Prompt C, Prompt D, and Prompt E.
+
+---
+
+# Business Concept
+
+Document Type:
+
+UNIT_TEST
+
+The generated result is:
+
+単体テスト仕様書.xlsx
+
+The purpose of this page is to generate practical unit test specifications that testers can execute directly.
+
+Do NOT generate unnecessary summary sheets.
+
+Do NOT generate a separate test result sheet.
+
+Execution-related columns such as 実施者, 実施日, 備考 should be included directly in each test sheet and left blank for users to fill in after testing.
+
+---
+
+# Navigation Structure
+
+Workspace
+
+├── 案件一覧
+├── 新規案件
+
+├── A案件
+│
+├── 要件定義書
+├── 基本設計書
+├── 詳細設計書
+├── 単体テスト仕様書
+│   ├── v1
+│   ├── v2
+│
+└── 結合テスト仕様書
+
+---
+
+# Input Source
+
+User must choose source.
+
+Required:
+
+● 詳細設計書
+
+○ 直接入力
+
+---
+
+# If Source = 詳細設計書
+
+Show:
+
+詳細設計書バージョン
+
+○ v1
+○ v2
+○ v3
+
+Load selected Detailed Design Document.
+
+Use it as AI input.
+
+Do NOT show screen list, API list, or table list input fields because they already exist in the Detailed Design Document.
+
+Show only:
+
+- Test Viewpoint Checkboxes
+- Additional Notes
+
+---
+
+# If Source = 直接入力
+
+Show the following fields.
+
+Required:
+
+## 1. 画面一覧
+
+Textarea
+
+Examples:
+
+- ログイン画面
+- ユーザー一覧画面
+- 商品一覧画面
+- 注文画面
+
+---
+
+Optional:
+
+## 2. API一覧
+
+Textarea
+
+Examples:
+
+- Login API
+- User API
+- Order API
+
+---
+
+## 3. テーブル一覧
+
+Textarea
+
+Examples:
+
+- users
+- orders
+- products
+
+---
+
+Then show:
+
+- Test Viewpoint Checkboxes
+- Additional Notes
+
+---
+
+# Test Viewpoint Checkboxes
+
+Display the following checkboxes.
+
+Default selected:
+
+- 正常系
+- 異常系
+- 入力チェック
+- API連携
+- DB更新
+
+Other selectable items:
+
+- 境界値
+- 権限チェック
+- 外部システム連携
+- CSV出力
+- メール送信
+- ファイルアップロード
+
+The user can freely select or unselect them.
+
+---
+
+# Additional Notes
+
+Optional textarea.
+
+Label:
+
+補足要件
+
+Examples:
+
+- ログイン機能を重点的に確認したい
+- 注文機能を重点的に確認したい
+- 決済まわりを重点的に確認したい
+
+---
+
+# Generation Mode
+
+● 標準版（推奨）
+
+○ カスタム
+
+---
+
+# Standard Version
+
+Generate 3 Sheets.
+
+---
+
+Sheet1
+
+画面テスト
+
+Columns:
+
+| No | 画面ID | テスト項目 | 前提条件 | テスト手順 | 期待結果 | 実施者 | 実施日 | 備考 |
+
+Rules:
+
+- Generate test cases based on screen items, screen processing, input checks, and selected test viewpoints.
+- 実施者, 実施日, 備考 must be generated as empty columns.
+- Do NOT fill execution result values.
+
+---
+
+Sheet2
+
+APIテスト
+
+Columns:
+
+| No | API ID | テスト項目 | 前提条件 | テスト手順 | 期待結果 | 実施者 | 実施日 | 備考 |
+
+Rules:
+
+- Generate test cases based on API definitions, request/response parameters, authentication, errors, and selected test viewpoints.
+- 実施者, 実施日, 備考 must be generated as empty columns.
+- Do NOT fill execution result values.
+
+---
+
+Sheet3
+
+DBテスト
+
+Columns:
+
+| No | テーブル名 | テスト項目 | 前提条件 | テスト手順 | 期待結果 | 実施者 | 実施日 | 備考 |
+
+Rules:
+
+- Generate test cases based on table definitions, table items, data creation, update, delete, and history requirements.
+- 実施者, 実施日, 備考 must be generated as empty columns.
+- Do NOT fill execution result values.
+
+---
+
+# Custom Mode
+
+Allow users to select any sheets from the 3 standard sheets.
+
+Checkboxes:
+
+□ 画面テスト
+□ APIテスト
+□ DBテスト
+
+At least one sheet must be selected.
+
+---
+
+# Generation Flow
+
+Use exactly the same interaction pattern as Prompt C, Prompt D, and Prompt E.
+
+Input
+↓
+Select test viewpoints
+↓
+Generate
+↓
+Progress Bar
+↓
+Auto Download Excel
+↓
+Create Version
+↓
+Show Re-download Button
+
+---
+
+# Progress Messages
+
+- 単体テスト観点を分析しています
+- テストケースを生成しています
+- Excelを生成しています
+- 完了しました
+
+---
+
+# Download Rules
+
+Successful generation:
+
+- Automatically download xlsx
+- Create new version
+
+Re-download:
+
+- Does not consume generation count
+
+---
+
+# Version Rules
+
+Generate:
+
+v1
+v2
+v3
+
+Refresh sidebar version tree automatically.
+
+---
+
+# Important Rules
+
+The Unit Test Specification must be based on detailed implementation-level information.
+
+If Source = 詳細設計書:
+
+Use selected Detailed Design Document as the main source.
+
+If Source = 直接入力:
+
+Use manually entered screen list, API list, table list, selected test viewpoints, and additional notes.
+
+Do NOT ask users to enter requirement-level fields such as:
+
+- 解決したい課題
+- 実現したいこと
+- 主な機能
+
+Unit test generation should be fast and checkbox-driven.
+
+---
+
+# Deliverables
+
+Generate:
+
+- Full page implementation
+- Form validation
+- Source selector
+- Version selector
+- Test viewpoint checkbox group
+- Custom sheet selector
+- Progress component
+- Success state
+- Error state
+- Auto-download logic
+- Re-download logic
+- Version refresh integration
+
+Do not modify unrelated pages.

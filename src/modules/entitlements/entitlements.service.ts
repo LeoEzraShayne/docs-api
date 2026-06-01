@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PlanType, Prisma } from '@prisma/client';
+import { DocumentType, PlanType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 const SUBSCRIPTION_QUOTAS: Record<string, number> = {
@@ -41,17 +41,23 @@ export class EntitlementsService {
     return this.addDocumentCredits(userId, 1, 'single_document');
   }
 
-  async addDocumentCredits(userId: string, count: number, source = 'single_document') {
+  async addDocumentCredits(
+    userId: string,
+    count: number,
+    source = 'single_document',
+  ) {
     await this.ensureForUser(userId);
     const months = source === 'business_pack' ? 12 : 0;
     const expiresAt = new Date();
     if (months) expiresAt.setMonth(expiresAt.getMonth() + months);
     else expiresAt.setDate(expiresAt.getDate() + 7);
 
+    const planType =
+      source === 'business_pack' ? PlanType.BUSINESS : PlanType.ONESHOT;
     const [, credit] = await this.prisma.$transaction([
       this.prisma.entitlement.update({
         where: { userId },
-        data: { oneshotCredits: { increment: count }, planType: PlanType.ONESHOT },
+        data: { oneshotCredits: { increment: count }, planType },
       }),
       this.prisma.documentCredit.create({
         data: { userId, quantity: count, source, expiresAt },
@@ -60,13 +66,26 @@ export class EntitlementsService {
     return credit;
   }
 
-  async consumeDocumentCredit(tx: Prisma.TransactionClient, userId: string) {
+  async consumeDocumentCredit(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    documentType: DocumentType,
+  ) {
     const credit = await tx.documentCredit.findFirst({
-      where: { userId, quantity: { gt: 0 }, expiresAt: { gt: new Date() } },
+      where: {
+        userId,
+        quantity: { gt: 0 },
+        expiresAt: { gt: new Date() },
+        OR: [
+          { source: 'business_pack' },
+          { source: 'single_document' },
+          { source: `single_document:${documentType}` },
+        ],
+      },
       orderBy: { expiresAt: 'asc' },
     });
     if (!credit) {
-      throw new BadRequestException('No document generation entitlement');
+      throw new BadRequestException('文書生成に利用できる購入枠がありません。');
     }
     await tx.documentCredit.update({
       where: { id: credit.id },
@@ -79,7 +98,10 @@ export class EntitlementsService {
     return credit;
   }
 
-  async syncSubscription(userId: string, planType: keyof typeof SUBSCRIPTION_QUOTAS) {
+  async syncSubscription(
+    userId: string,
+    planType: keyof typeof SUBSCRIPTION_QUOTAS,
+  ) {
     const quotaTotal = SUBSCRIPTION_QUOTAS[planType] ?? 0;
     const now = new Date();
     const nextMonth = new Date(now);
@@ -136,7 +158,9 @@ export class EntitlementsService {
       entitlement.planType !== PlanType.PRO &&
       entitlement.planType !== PlanType.BUSINESS
     ) {
-      throw new BadRequestException('High quality requires Pro or Business');
+      throw new BadRequestException(
+        '高品質生成は Pro / Business のみ利用できます。',
+      );
     }
 
     if (entitlement.oneshotCredits > 0 || remainingSubscription > 0) {
@@ -156,7 +180,7 @@ export class EntitlementsService {
     const entitlement = await tx.entitlement.findUnique({ where: { userId } });
 
     if (!entitlement) {
-      throw new NotFoundException('Entitlement not found');
+      throw new NotFoundException('利用状況が見つかりません。');
     }
 
     if (entitlement.oneshotCredits > 0) {
@@ -167,9 +191,12 @@ export class EntitlementsService {
       return;
     }
 
-    const remaining = Math.max(0, entitlement.quotaTotal - entitlement.quotaUsed);
+    const remaining = Math.max(
+      0,
+      entitlement.quotaTotal - entitlement.quotaUsed,
+    );
     if (remaining < 1) {
-      throw new BadRequestException('No credits remaining');
+      throw new BadRequestException('利用可能な生成枠がありません。');
     }
 
     await tx.entitlement.update({
@@ -177,5 +204,4 @@ export class EntitlementsService {
       data: { quotaUsed: { increment: 1 } },
     });
   }
-
 }

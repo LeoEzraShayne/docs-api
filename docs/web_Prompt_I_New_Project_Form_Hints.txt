@@ -1,0 +1,418 @@
+# web_Prompt_I_New_Project_Form_Placeholders.txt
+# Improve New Project Form Placeholders / Compact Guidance
+
+You are improving the "New Project" page for the SaaS product 「日语上流文档一键生成」 / 「XX要件定義」.
+
+Target page:
+- New Project creation page
+- Current route is likely:
+  /app/new
+
+Do NOT redesign the whole application.
+Do NOT change colors, branding, billing, authentication, sidebar, document generation pages, or unrelated layouts.
+
+Modify ONLY:
+- Placeholder text
+- A small number of compact helper texts
+- A small number of compact example chips
+- Page description text
+- Validation messages if needed
+
+Keep the existing enterprise dark UI style.
+
+---
+
+# Current Problem
+
+The New Project form fields are too unclear.
+
+Users may not know what to enter, especially for:
+
+- 業界
+- システム種別
+- 目的
+- 対象範囲
+- 議事録
+
+Example:
+For 「システム種別」, users may not know whether to enter:
+- Androidアプリ
+- Webアプリ
+- macOSアプリ
+- 業務システム
+- 管理画面
+- ECサイト
+- SaaS
+
+The form needs better placeholders and compact guidance.
+
+---
+
+# Important UX Policy
+
+Do NOT add large helper text under every field.
+Do NOT show example lists under every field.
+Do NOT make the form visually noisy.
+
+Use placeholders as the main guidance method.
+
+Only these fields may have visible compact examples or small gray helper text:
+
+1. 業界
+2. システム種別
+3. 目的
+4. 対象範囲
+5. 議事録
+
+All other fields should use placeholder text only.
+
+If helper text is used, keep it:
+- Small
+- Gray
+- One short sentence
+- Not visually dominant
+
+If example chips are used, keep them:
+- Small
+- Limited to 4 to 8 chips
+- One line or compact wrapping
+- Only for the five fields listed above
+
+---
+
+# Page Description
+
+Current page description may say something like:
+
+入力後、無料 preview または stripe checkout に進めます。
+
+Replace it with natural Japanese:
+
+入力後、無料プレビューまたはExcel生成に進めます。
+
+Do NOT mention Stripe checkout in this form description.
+Payment details belong to pricing/payment pages, not the input form.
+
+---
+
+# Form Field Requirements
+
+## 1. 案件タイトル
+
+Required:
+Yes
+
+Placeholder:
+例：販売管理システム、勤怠管理アプリ、EC注文管理、脳波測定アプリ
+
+No helper text.
+No example chips.
+
+Validation message:
+案件タイトルを入力してください。
+
+---
+
+## 2. 業界
+
+Required:
+Yes
+
+Placeholder:
+例：小売、製造、医療、教育、金融、物流、スポーツ、社内業務
+
+Optional small helper text:
+このシステムを利用する業界・業務領域を入力してください。
+
+Optional compact chips:
+小売 / 製造 / 医療 / 教育 / 金融 / 物流 / スポーツ / 社内業務
+
+Validation message:
+業界を入力してください。
+
+---
+
+## 3. システム種別
+
+Required:
+Yes
+
+Placeholder:
+例：Webアプリ、Androidアプリ、iOSアプリ、管理画面、業務システム、ECサイト、SaaS
+
+Small helper text:
+技術名でも業務上の種類でも入力できます。
+
+Compact chips:
+Webアプリ / Androidアプリ / iOSアプリ / 管理画面 / 業務システム / ECサイト / SaaS / API連携
+
+Acceptable examples:
+- Webアプリ
+- Androidアプリ
+- iOSアプリ
+- macOSアプリ
+- Windowsアプリ
+- 管理画面
+- 業務システム
+- ECサイト
+- SaaS
+- API連携システム
+- Web管理画面 + Androidアプリ
+- ECサイト + 管理画面
+- SaaS型業務システム
+
+Do NOT force this field to be a dropdown.
+A free text input is preferred.
+
+Validation message:
+システム種別を入力してください。
+
+Soft warning for vague values:
+より具体的に入力すると、生成される文書の精度が上がります。
+
+---
+
+## 4. 目的
+
+Required:
+Yes
+
+Placeholder:
+例：手作業の注文管理を自動化し、入力ミスと確認工数を削減する。
+
+Optional small helper text:
+このシステムで何を改善したいかを入力してください。
+
+Optional compact chips:
+業務効率化 / 手作業削減 / データ一元管理 / 見える化 / 承認電子化
+
+Validation message:
+目的を入力してください。
+
+---
+
+## 5. 背景
+
+Required:
+No
+
+Placeholder:
+例：現在はExcelとメールで注文を管理しており、担当者ごとに情報が分散している。
+
+No helper text.
+No example chips.
+
+---
+
+## 6. ゴール
+
+Required:
+No
+
+Placeholder:
+例：注文、在庫、売上情報を一つのシステムで管理し、リアルタイムに確認できる状態にする。
+
+No helper text.
+No example chips.
+
+---
+
+## 7. 対象範囲
+
+Required:
+No
+
+Placeholder:
+例：注文登録、在庫確認、売上集計、CSV出力、管理者画面
+
+Optional small helper text:
+今回のシステム化対象に含める業務・機能を入力してください。
+
+Optional compact chips:
+ユーザー管理 / 注文管理 / 在庫管理 / 売上管理 / 承認フロー / CSV出力 / 管理者画面
+
+---
+
+## 8. 対象外
+
+Required:
+No
+
+Placeholder:
+例：決済処理、会計システム連携、スマートフォンアプリ対応は初期リリースでは対象外とする。
+
+No helper text.
+No example chips.
+
+---
+
+## 9. 前提条件
+
+Required:
+No
+
+Placeholder:
+例：利用者は社内メンバーのみ。管理者と一般利用者で権限を分ける。
+
+No helper text.
+No example chips.
+
+---
+
+## 10. 制約
+
+Required:
+No
+
+Placeholder:
+例：初期リリースではWeb版のみ対応し、スマートフォンアプリは対象外とする。
+
+No helper text.
+No example chips.
+
+---
+
+## 11. 関係者
+
+Required:
+No
+
+Placeholder:
+例：営業担当、管理者、承認者、経理担当、システム管理者
+
+No helper text.
+No example chips.
+
+---
+
+## 12. 議事録
+
+Required:
+Yes
+
+Placeholder:
+例：
+現在はExcelで注文を管理している。
+注文内容の確認に時間がかかっている。
+在庫状況がリアルタイムに分からない。
+管理者は売上レポートを確認したい。
+将来的には外部会計システムと連携したい。
+
+Small helper text:
+打ち合わせ内容、要望、業務課題などを貼り付けてください。箇条書きでも構いません。
+
+Optional compact chips:
+課題 / 要望 / 業務フロー / 利用者 / 外部連携 / 制約
+
+Character count:
+0 / 20000
+
+Validation message:
+議事録を入力してください。
+
+---
+
+# Optional Input Tips Panel
+
+If there is already a small hint panel near the top, update it.
+
+If there is no hint panel, adding one is optional.
+
+Title:
+入力のコツ
+
+Content:
+任意項目は空欄でも構いません。
+ただし、目的・システム種別・議事録を具体的に入力すると、生成される文書の精度が上がります。
+
+Important:
+Do NOT write:
+分からない項目は空欄でも構いません。
+
+Reason:
+It may make users think required fields can be empty.
+
+The correct wording is:
+任意項目は空欄でも構いません。
+
+Keep the panel compact.
+
+---
+
+# Button Area Text
+
+Keep the existing buttons if they already work:
+
+- プレビュー生成（無料）
+- 購入してExcel生成（有料）
+
+But update surrounding explanatory text to natural Japanese.
+
+Recommended text:
+未購入ユーザーはプレビューを1日1回まで利用できます。
+Excel生成には購入が必要です。
+
+Do NOT mention Stripe checkout in the form description.
+
+---
+
+# UI Density Rules
+
+The current form is already long.
+
+Do not add visible examples under every field.
+
+Allowed visible guidance density:
+
+High guidance:
+- システム種別
+- 議事録
+
+Medium guidance:
+- 業界
+- 目的
+- 対象範囲
+
+Low guidance:
+- 案件タイトル
+- 背景
+- ゴール
+- 対象外
+- 前提条件
+- 制約
+- 関係者
+
+For low guidance fields:
+- Placeholder only.
+
+---
+
+# Acceptance Criteria
+
+The implementation is correct when:
+
+1. Each field has a useful Japanese placeholder.
+2. Only 業界, システム種別, 目的, 対象範囲, 議事録 have visible helper text or chips.
+3. The form does not become visually noisy.
+4. 「システム種別」 clearly explains that both platform type and business system type are acceptable.
+5. The top page description says:
+   入力後、無料プレビューまたはExcel生成に進めます。
+6. The input tips panel, if present, says:
+   任意項目は空欄でも構いません。
+7. Required fields still show clear validation messages.
+8. The existing dark enterprise UI remains unchanged.
+9. No unrelated pages are modified.
+
+---
+
+# Deliverable
+
+Update the New Project form with:
+
+- Better placeholder text
+- Compact helper text only where necessary
+- Compact chips only for selected fields
+- Natural Japanese page description
+- Clear validation messages
+
+Do not modify unrelated functionality.

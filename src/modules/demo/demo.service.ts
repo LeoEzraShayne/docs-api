@@ -35,11 +35,13 @@ export class DemoService {
     ]);
 
     if (recentMinute >= 1) {
-      throw new TooManyRequestsException('Please try demo again later');
+      throw new TooManyRequestsException(
+        'しばらくしてから再度お試しください。',
+      );
     }
 
     if ((daily?.count ?? 0) >= 3) {
-      throw new TooManyRequestsException('Demo daily limit reached');
+      throw new TooManyRequestsException('本日のデモ利用上限に達しました。');
     }
 
     if (daily) {

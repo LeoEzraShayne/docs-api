@@ -47,7 +47,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('User not found');
+      throw new UnauthorizedException('ユーザーが見つかりません。');
     }
 
     return {
@@ -83,11 +83,13 @@ export class AuthService {
     ]);
 
     if (recentEmailCode) {
-      throw new TooManyRequestsException('Please wait 60 seconds before retrying');
+      throw new TooManyRequestsException('60秒後にもう一度お試しください。');
     }
 
     if (ipCount >= 5) {
-      throw new TooManyRequestsException('Too many requests from this IP');
+      throw new TooManyRequestsException(
+        'アクセスが集中しています。しばらくしてからもう一度お試しください。',
+      );
     }
 
     const user = await this.usersService.upsertEmailUser(normalizedEmail);
@@ -104,19 +106,31 @@ export class AuthService {
       },
     });
 
-    if (this.resend) {
-      await this.resend.emails.send({
-        from:
-          this.configService.get<string>('MAIL_FROM') ??
-          'Docs <no-reply@official.meritledger.org>',
-        to: normalizedEmail,
-        subject: VERIFY_CODE_EMAIL_SUBJECT,
-        html: buildVerifyCodeEmail(code),
-        text: buildVerifyCodeText(code),
-      });
+    let emailSent = false;
+    try {
+      if (this.resend) {
+        await this.resend.emails.send({
+          from:
+            this.configService.get<string>('MAIL_FROM') ??
+            'Docs <no-reply@official.meritledger.org>',
+          to: normalizedEmail,
+          subject: VERIFY_CODE_EMAIL_SUBJECT,
+          html: buildVerifyCodeEmail(code),
+          text: buildVerifyCodeText(code),
+        });
+        emailSent = true;
+      }
+    } catch (error) {
+      if (!this.isDevelopment()) {
+        throw error;
+      }
     }
 
-    return { ok: true };
+    return {
+      ok: true,
+      emailSent,
+      ...(this.isDevelopment() && !emailSent ? { devCode: code } : {}),
+    };
   }
 
   async verifyEmailCode(email: string, code: string) {
@@ -132,7 +146,7 @@ export class AuthService {
     });
 
     if (!loginCode) {
-      throw new UnauthorizedException('Invalid code');
+      throw new UnauthorizedException('認証コードが正しくありません。');
     }
 
     await this.prisma.loginCode.update({
@@ -155,7 +169,7 @@ export class AuthService {
   async loginWithGoogle(idToken: string) {
     const clientIds = this.getGoogleClientIds();
     if (clientIds.length === 0) {
-      throw new BadRequestException('GOOGLE_CLIENT_ID is not configured');
+      throw new BadRequestException('Googleログイン設定が不足しています。');
     }
 
     let ticket;
@@ -165,12 +179,12 @@ export class AuthService {
         audience: clientIds,
       });
     } catch {
-      throw new UnauthorizedException('Invalid Google token');
+      throw new UnauthorizedException('Googleログインの認証に失敗しました。');
     }
     const payload = ticket.getPayload();
 
     if (!payload?.email || !payload.sub) {
-      throw new UnauthorizedException('Invalid Google token');
+      throw new UnauthorizedException('Googleログインの認証に失敗しました。');
     }
 
     const user = await this.usersService.upsertGoogleUser(
@@ -217,5 +231,9 @@ export class AuthService {
       .split(',')
       .map((item) => item.trim().replace(/^['"]|['"]$/g, ''))
       .filter(Boolean);
+  }
+
+  private isDevelopment() {
+    return this.configService.get<string>('NODE_ENV') !== 'production';
   }
 }

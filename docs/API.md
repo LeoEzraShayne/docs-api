@@ -48,7 +48,18 @@ Response
 
 ```json
 {
-  "ok": true
+  "ok": true,
+  "emailSent": true
+}
+```
+
+Local development response may include `devCode` when Resend is unavailable or fails.
+
+```json
+{
+  "ok": true,
+  "emailSent": false,
+  "devCode": "123456"
 }
 ```
 
@@ -523,6 +534,113 @@ Response
 }
 ```
 
+### `GET /billing/account-usage`
+
+Returns the account usage page data.
+
+Response
+
+```json
+{
+  "summary": {
+    "email": "user@example.com",
+    "planType": "ONESHOT",
+    "hasBusinessPack": false,
+    "nearestExpiresAt": "2026-06-08T00:00:00.000Z",
+    "needsPurchase": false
+  },
+  "documents": [
+    {
+      "projectId": "project_id",
+      "projectTitle": "脳波測定",
+      "documentId": "document_id",
+      "documentType": "BASIC_DESIGN",
+      "documentTitle": "基本設計書",
+      "generationCount": 1,
+      "remainingGenerations": 2,
+      "expiresAt": "2026-06-08T00:00:00.000Z",
+      "status": "利用中"
+    }
+  ]
+}
+```
+
+Business Pack response includes the shared document-credit pool in `summary.businessPack`.
+
+```json
+{
+  "summary": {
+    "email": "user@example.com",
+    "planType": "BUSINESS",
+    "hasBusinessPack": true,
+    "businessPack": {
+      "totalDocumentCredits": 78,
+      "unstartedDocumentCredits": 72,
+      "startedDocumentCount": 6,
+      "expiresAt": "2027-06-01T00:00:00.000Z",
+      "status": "利用中"
+    },
+    "nearestExpiresAt": "2027-06-01T00:00:00.000Z",
+    "needsPurchase": false
+  },
+  "documents": [
+    {
+      "projectId": "project_id",
+      "projectTitle": "脳波測定",
+      "documentId": "document_id",
+      "documentType": "REQUIREMENTS",
+      "documentTitle": "要件定義書",
+      "generationCount": 2,
+      "expiresAt": "2027-06-01T00:00:00.000Z",
+      "status": "利用中"
+    }
+  ]
+}
+```
+
+Notes
+
+- Docs Single / ONESHOT document rows include `remainingGenerations`.
+- Business Pack document rows omit `remainingGenerations`; the pool is shared across all document types.
+- Expired or fully used rows return `status: "利用不可"`.
+
+### `GET /billing/purchases`
+
+Query
+
+- `page`: default `1`
+- `pageSize`: default `10`; allowed values `10`, `30`, `50`
+
+Response
+
+```json
+{
+  "items": [
+    {
+      "id": "payment_id",
+      "purchasedAt": "2026-06-01T00:00:00.000Z",
+      "productName": "Docs Single",
+      "documentType": "BASIC_DESIGN",
+      "documentTitle": "基本設計書",
+      "amountJpy": 980,
+      "status": "paid",
+      "grantedContent": "1文書",
+      "stripeSessionId": "cs_live_xxx",
+      "stripeInvoiceId": null
+    }
+  ],
+  "page": 1,
+  "pageSize": 10,
+  "total": 1,
+  "totalPages": 1
+}
+```
+
+Notes
+
+- `documentType` / `documentTitle` are set for Docs Single purchases made through the app checkout.
+- Business Pack returns `documentType: null`, `documentTitle: null`, and `grantedContent: "78文書枠"`.
+
 ### `GET /billing/portal`
 
 Response
@@ -535,6 +653,16 @@ Response
 
 ### `POST /billing/checkout/oneshot`
 
+Legacy alias for `POST /billing/checkout/single-document`.
+
+Request
+
+```json
+{
+  "documentType": "BASIC_DESIGN"
+}
+```
+
 Response
 
 ```json
@@ -545,13 +673,24 @@ Response
 
 ### `POST /billing/checkout/single-document`
 
-Alias for the current one-document purchase flow.
+Creates a Docs Single payment for one selected document type.
+
+Request
+
+```json
+{
+  "documentType": "BASIC_DESIGN"
+}
+```
 
 Behavior
 
 - With Stripe configured, creates a one-time Checkout Session using `STRIPE_PRICE_SINGLE_DOCUMENT`.
 - Falls back to `STRIPE_PRICE_ONESHOT` for backward compatibility.
-- Without Stripe configured, grants one stub single-document credit and returns a local success URL.
+- If no Stripe Price ID is configured, uses Checkout `price_data` with JPY 980.
+- Without Stripe configured, grants one stub single-document credit, records a stub payment history row, and returns a local success URL.
+- `documentType` is written to Stripe Checkout metadata and later to purchase history.
+- A typed Docs Single credit can only start a grant for the selected document type. Business Pack credits can start any document type.
 
 Response
 
@@ -566,7 +705,8 @@ Response
 Behavior
 
 - With Stripe configured, creates a one-time Checkout Session using `STRIPE_PRICE_BUSINESS_PACK`.
-- Without Stripe configured, grants 78 stub document credits and returns a local success URL.
+- If no Stripe Price ID is configured, uses Checkout `price_data` with JPY 66,640.
+- Without Stripe configured, grants 78 stub document credits, records a stub payment history row, and returns a local success URL.
 
 Response
 
@@ -595,7 +735,7 @@ Handled events
 
 Behavior
 
-- single document / legacy one-shot payment success -> 1 document credit
+- single document / legacy one-shot payment success -> 1 typed document credit when `documentType` metadata exists
 - business pack payment success -> 78 document credits
 - subscription invoice paid -> refresh period/quota
 

@@ -54,6 +54,42 @@ describe('document output helpers', () => {
     expect(output.metadata).toEqual({ model: 'stub' });
   });
 
+  it('fills missing physical table names for database design sheets', () => {
+    const basic = normalizeDocumentOutput(
+      DocumentType.BASIC_DESIGN,
+      ['データベース設計'],
+      {
+        sheets: {
+          データベース設計: [
+            { テーブル論理名: 'ユーザー' },
+            { テーブル論理名: '測定データ' },
+          ],
+        },
+      },
+    );
+    const detailed = normalizeDocumentOutput(
+      DocumentType.DETAILED_DESIGN,
+      ['テーブル詳細設計', 'テーブル項目定義'],
+      {
+        sheets: {
+          テーブル詳細設計: [{ テーブル論理名: '測定データ' }],
+          テーブル項目定義: [{ テーブル論理名: '測定データ' }],
+        },
+      },
+    );
+
+    expect(basic.sheets['データベース設計']).toMatchObject([
+      { テーブル論理名: 'ユーザー', テーブル物理名: 'user' },
+      { テーブル論理名: '測定データ', テーブル物理名: 'measurement_data' },
+    ]);
+    expect(detailed.sheets['テーブル詳細設計'][0]).toMatchObject({
+      テーブル物理名: 'measurement_data',
+    });
+    expect(detailed.sheets['テーブル項目定義'][0]).toMatchObject({
+      テーブル物理名: 'measurement_data',
+    });
+  });
+
   it('rejects missing required sheet rows', () => {
     expect(() =>
       normalizeDocumentOutput(

@@ -23,7 +23,7 @@ export class DocumentGrantsService {
       return existing;
     }
 
-    await this.entitlements.consumeDocumentCredit(tx, userId);
+    await this.entitlements.consumeDocumentCredit(tx, userId, documentType);
     const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
     return tx.documentGrant.upsert({
@@ -36,7 +36,7 @@ export class DocumentGrantsService {
   async consumeGeneration(tx: Prisma.TransactionClient, documentId: string) {
     const grant = await tx.documentGrant.findUnique({ where: { documentId } });
     if (!grant || grant.remainingGenerations < 1 || grant.expiresAt <= new Date()) {
-      throw new BadRequestException('No document generations remaining');
+      throw new BadRequestException('この文書の残り生成回数がありません。');
     }
 
     return tx.documentGrant.update({

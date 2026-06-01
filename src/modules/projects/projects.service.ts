@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { PlanType, Prisma } from '@prisma/client';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -19,19 +19,25 @@ export class ProjectsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(userId: string, input: UpsertProjectInput) {
-    const count = await this.prisma.project.count({ where: { userId } });
-    if (count >= 3) {
-      throw new BadRequestException('Free tier project limit reached');
+    const [count, entitlement] = await Promise.all([
+      this.prisma.project.count({ where: { userId } }),
+      this.prisma.entitlement.findUnique({ where: { userId } }),
+    ]);
+    const planType = entitlement?.planType ?? PlanType.FREE;
+    if (planType === PlanType.FREE && count >= 3) {
+      throw new BadRequestException(
+        '無料プランの案件作成上限に達しました。不要な案件を削除するか、文書枠を購入してから続行してください。',
+      );
     }
 
     if ((input.minutesText?.length ?? 0) > 20_000) {
-      throw new BadRequestException('minutesText exceeds 20,000 characters');
+      throw new BadRequestException('議事録は20,000文字以内にしてください。');
     }
 
     return this.prisma.project.create({
       data: {
         userId,
-        docTitle: input.docTitle?.trim() || '无标题项目',
+        docTitle: input.docTitle?.trim() || '無題の案件',
         formFields: (input.formFields ?? {}) as Prisma.InputJsonValue,
         minutesText: input.minutesText ?? '',
       },
@@ -71,11 +77,11 @@ export class ProjectsService {
     });
 
     if (!project) {
-      throw new NotFoundException('Project not found');
+      throw new NotFoundException('案件が見つかりません。');
     }
 
     if (project.userId !== userId) {
-      throw new ForbiddenException('Project does not belong to user');
+      throw new ForbiddenException('この案件にアクセスする権限がありません。');
     }
 
     return project;
@@ -104,7 +110,7 @@ export class ProjectsService {
     });
 
     if (!version) {
-      throw new NotFoundException('Version not found');
+      throw new NotFoundException('バージョンが見つかりません。');
     }
 
     return {
@@ -122,7 +128,7 @@ export class ProjectsService {
     await this.getOwnedProject(userId, projectId);
 
     if ((input.minutesText?.length ?? 0) > 20_000) {
-      throw new BadRequestException('minutesText exceeds 20,000 characters');
+      throw new BadRequestException('議事録は20,000文字以内にしてください。');
     }
 
     return this.prisma.project.update({

@@ -47,7 +47,7 @@ export class GenerateService {
       project.lastGenerateAt &&
       now.getTime() - project.lastGenerateAt.getTime() < 30_000
     ) {
-      throw new TooManyRequestsException('Generate cooldown: 30 seconds');
+      throw new TooManyRequestsException('30秒待ってから再実行してください。');
     }
 
     if (input.mode === 'preview') {
@@ -217,7 +217,7 @@ export class GenerateService {
     });
 
     if (!version) {
-      throw new BadRequestException('Version not found');
+      throw new BadRequestException('バージョンが見つかりません。');
     }
 
     const canExport = await this.entitlementsService.assertCanExport(
@@ -226,7 +226,7 @@ export class GenerateService {
     );
 
     if (!canExport.canExport) {
-      throw new BadRequestException('No export credits remaining');
+      throw new BadRequestException('利用可能なExcel出力枠がありません。');
     }
 
     const excelStartedAt = Date.now();
@@ -264,7 +264,7 @@ export class GenerateService {
       if (error instanceof ServiceUnavailableException) {
         throw error;
       }
-      throw new BadRequestException('Failed to generate Excel');
+      throw new BadRequestException('Excel生成に失敗しました。');
     }
   }
 
@@ -279,16 +279,19 @@ export class GenerateService {
     });
 
     if ((usage?.count ?? 0) >= 1) {
-      throw new TooManyRequestsException('Preview limit reached for today');
+      throw new TooManyRequestsException('本日の無料プレビュー上限に達しました。');
     }
 
-    const projectCount = await this.prisma.project.count({ where: { userId } });
-    if (projectCount > 3) {
-      throw new BadRequestException('Preview unavailable beyond free limit');
+    const [projectCount, entitlement] = await Promise.all([
+      this.prisma.project.count({ where: { userId } }),
+      this.prisma.entitlement.findUnique({ where: { userId } }),
+    ]);
+    if ((!entitlement || entitlement.planType === 'FREE') && projectCount > 3) {
+      throw new BadRequestException('無料プレビューの上限を超えています。');
     }
 
     if (!projectId) {
-      throw new BadRequestException('Project id required');
+      throw new BadRequestException('案件IDが必要です。');
     }
   }
 }

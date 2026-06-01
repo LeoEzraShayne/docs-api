@@ -1,0 +1,496 @@
+# Prompt D（给 Codex：生成 基本設計書 页面）
+
+You are building the "Basic Design Document" page for the SaaS product 「XX要件定義」.
+
+This page belongs to:
+
+/app/projects/[projectId]/documents/basic-design
+
+Implement ONLY the Basic Design page.
+
+Do NOT redesign the platform.
+
+Use the same UI style, layout, authentication, billing, progress bar, download mechanism, version management, and generation workflow already implemented in Prompt C.
+
+---
+
+# Business Concept
+
+Document Type:
+
+BASIC_DESIGN
+
+The generated result is:
+
+基本設計書.xlsx
+
+---
+
+# Navigation Structure
+
+Workspace
+
+├── 案件一覧
+├── 新規案件
+
+├── A案件
+│
+├── 要件定義書
+├── 基本設計書
+│   ├── v1
+│   ├── v2
+│
+├── 詳細設計書
+├── 単体テスト仕様書
+└── 結合テスト仕様書
+
+---
+
+# Input Source
+
+User must choose source.
+
+Required:
+
+● 要件定義書
+
+○ 直接入力
+
+---
+
+# If Source = 要件定義書
+
+Show:
+
+要件定義書バージョン
+
+○ v1
+○ v2
+○ v3
+
+Load selected Requirements Document.
+
+Use it as AI input.
+
+---
+
+# If Source = 直接入力
+
+Show the same requirement fields as Prompt C.
+
+Required:
+
+1. 解決したい課題
+
+2. 実現したいこと
+
+3. 主な機能
+
+Optional:
+
+4. 利用者
+
+5. 外部連携システム
+
+6. 特別な要件
+
+# Additional Design Inputs
+
+Required:
+
+## 1. System Structure Requirements
+
+Description:
+
+Describe what major parts the system should contain.
+
+Examples:
+
+- User operation screens
+- Administrator screens
+- Scheduled processing
+- External system integration
+- Data export functions
+
+---
+
+## 2. Screen Design Requirements
+
+Description:
+
+Describe what users should be able to do on the screens.
+
+Examples:
+
+- Support search functionality
+- Support paging
+- Support CSV export
+- Support bulk operations
+- Support mobile devices
+
+---
+
+## 3. System Integration Requirements
+
+Description:
+
+Describe how this system should interact with other systems.
+
+Examples:
+
+- Integrate with a payment system
+- Integrate with an ERP system
+- Send data to external systems
+- Receive data from external systems
+
+---
+
+## 4. Data Management Requirements
+
+Description:
+
+Describe how business data should be managed.
+
+Examples:
+
+- User information must be retained long term
+- Deleted data should be preserved as history
+- Operation history should be recorded
+- Data export should be supported
+
+---
+
+Optional:
+
+## 5. Permission Requirements
+
+Description:
+
+Describe user roles and access requirements.
+
+Examples:
+
+- Administrator
+- General User
+- Approver
+- Finance Staff
+
+---
+
+## 6. System Operation Requirements
+
+Description:
+
+Describe operational and quality requirements.
+
+Examples:
+
+- Stable system operation
+- Regular data backup
+- Operation history recording
+- Support for large numbers of users
+
+---
+
+## 7. Batch / Report Requirements
+
+Description:
+
+Describe scheduled processing and reporting requirements.
+
+Examples:
+
+- Daily reports
+- Monthly reports
+- CSV export
+- Scheduled processing
+
+---
+
+## 8. Special Business Requirements
+
+Description:
+
+Describe any special business requirements.
+
+Examples:
+
+- Multi-language support
+- Approval workflow
+- Multi-user collaboration
+- Mobile device support
+
+# Generation Mode
+
+● 標準版（推奨）
+
+○ カスタム
+
+---
+
+# Standard Version
+
+Generate 10 Sheets.
+
+---
+Sheet1
+
+基本設計概要
+
+Document Style.
+
+Generate narrative content.
+
+Include:
+
+* System Overview
+* Design Policy
+* Scope
+* Assumptions
+* Constraints
+
+---
+
+Sheet2
+
+システム構成設計
+
+Columns:
+
+| No | 論理名 | 物理名 | 種別 | 主な役割 | 入力 | 出力 | 備考 |
+
+Examples:
+
+| 1 | ユーザー画面 | user-web | Frontend | ユーザー操作 | ユーザー操作 | API呼出 | Web画面 |
+| 2 | 管理画面 | admin-web | Frontend | 管理業務 | 管理者操作 | API呼出 | 管理画面 |
+| 3 | 注文API | order-api | Backend | 注文処理 | HTTP Request | JSON Response | API |
+
+---
+
+Sheet3
+
+画面遷移一覧
+
+Columns:
+
+| No | 現在画面 | 操作 | 遷移先画面 |
+
+---
+
+Sheet4
+
+画面設計
+
+Columns:
+
+| No | 画面名 | 画面ID | 画面目的 | 主な機能 |
+
+Examples:
+
+| 1 | ログイン画面 | SCR-001 | ユーザー認証 | ログイン |
+| 2 | ユーザー一覧画面 | SCR-002 | ユーザー管理 | 検索・登録・編集 |
+
+---
+
+Sheet5
+
+機能設計
+
+Columns:
+
+| No | 機能名 | 機能ID | 機能説明 | 入力 | 出力 |
+
+Examples:
+
+| 1 | ユーザー登録 | FUNC-001 | ユーザーを登録する | ユーザー情報 | 登録結果 |
+
+---
+
+Sheet6
+
+API設計
+
+Columns:
+
+| No | API名 | API ID | URL | Method | 機能概要 | リクエスト概要 | レスポンス概要 |
+
+Rules:
+
+Generate design-level API definitions.
+
+Do NOT generate:
+
+* Error Codes
+* Validation Rules
+* Request Schema
+* Response Schema
+* SQL Logic
+
+These belong to Detailed Design.
+
+Examples:
+
+| 1 | ユーザー登録API | API-001 | /api/users | POST | ユーザー登録 | ユーザー情報 | 登録結果 |
+
+---
+
+Sheet7
+
+データベース設計
+
+Columns:
+
+| No | テーブル論理名 | テーブル物理名 | 目的 | 主な項目 | 主キー |
+
+Rules:
+
+Generate logical database design only.
+
+Do NOT generate:
+
+* Data Types
+* Length
+* Indexes
+* Foreign Keys
+* DDL
+
+These belong to Detailed Design.
+
+Examples:
+
+| 1 | ユーザー | users | ユーザー管理 | id, name, email | id |
+| 2 | 注文 | orders | 注文管理 | id, user_id, amount | id |
+
+---
+
+Sheet8
+
+権限設計
+
+Columns:
+
+| No | ロール名 | 対象機能 | 参照 | 更新 | 削除 | 備考 |
+
+Examples:
+
+| 1 | 管理者 | ユーザー管理 | ○ | ○ | ○ | 全権限 |
+| 2 | 一般ユーザー | 個人情報管理 | ○ | ○ | × | 自分のみ |
+
+---
+
+Sheet9
+
+バッチ・帳票設計
+
+Columns:
+
+| No | 名称 | 種別 | 実行タイミング | 機能概要 |
+
+Examples:
+
+| 1 | 日次売上集計 | Batch | 毎日0:00 | 売上集計 |
+| 2 | 月次売上レポート | Report | 毎月1日 | 売上レポート出力 |
+
+---
+
+Sheet10
+
+非機能設計
+
+Columns:
+
+| No | 分類 | 要件 | 説明 |
+
+Categories may include:
+
+* Security
+* Performance
+* Availability
+* Backup
+* Monitoring
+* Audit
+
+Examples:
+
+| 1 | Security | 認証機能が必要 | 不正アクセス防止 |
+| 2 | Performance | 3秒以内応答 | ユーザー体験向上 |
+
+---
+
+# Custom Mode
+
+Allow users to select any sheets from the 10 standard sheets.
+
+At least one sheet must be selected.
+
+---
+
+# Generation Flow
+
+Use exactly the same interaction pattern as Prompt C.
+
+Input
+↓
+Generate
+↓
+Progress Bar
+↓
+Auto Download Excel
+↓
+Create Version
+↓
+Show Re-download Button
+
+---
+
+# Progress Messages
+
+* 基本設計を分析しています
+* システム構成を設計しています
+* Excelを生成しています
+* 完了しました
+
+---
+
+# Download Rules
+
+Successful generation:
+
+* Automatically download xlsx
+* Create new version
+
+Re-download:
+
+* Does not consume generation count
+
+---
+
+# Version Rules
+
+Generate:
+
+v1
+v2
+v3
+
+Refresh sidebar version tree automatically.
+
+---
+
+# Deliverables
+
+Generate:
+
+* Full page implementation
+* Form validation
+* Source selector
+* Version selector
+* Sheet selector
+* Progress component
+* Success state
+* Error state
+* Auto-download logic
+* Re-download logic
+* Version refresh integration
+
+Do not modify unrelated pages.

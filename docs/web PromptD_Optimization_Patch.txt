@@ -1,0 +1,157 @@
+# Prompt D Optimization Patch
+
+# Replace "Additional Design Inputs" with:
+
+# Additional Design Inputs
+
+Required:
+
+## 1. システム構成要件
+
+Description:
+
+Describe what major parts the system should contain.
+
+Examples:
+
+- 利用者向け画面
+- 管理者向け画面
+- 定期処理
+- 外部システム連携
+- データ出力機能
+
+---
+
+## 2. 画面設計要件
+
+Description:
+
+Describe what users should be able to do on the screens.
+
+Examples:
+
+- 検索機能
+- ページング
+- CSV出力
+- 一括操作
+- モバイル対応
+
+---
+
+## 3. 外部連携要件
+
+Description:
+
+Describe how this system should interact with other systems.
+
+Examples:
+
+- 決済システム連携
+- ERP連携
+- 外部システムへのデータ送信
+- 外部システムからのデータ受信
+
+---
+
+## 4. データ管理要件
+
+Description:
+
+Describe how business data should be managed.
+
+Examples:
+
+- 利用者情報を長期保存する
+- 削除データの履歴を保持する
+- 操作履歴を記録する
+- データ出力を可能にする
+
+---
+
+Optional:
+
+## 5. 権限要件
+
+Description:
+
+Describe user roles and access requirements.
+
+Examples:
+
+- 管理者
+- 一般利用者
+- 承認者
+- 経理担当者
+
+---
+
+## 6. 運用要件
+
+Description:
+
+Describe operational and quality requirements.
+
+Examples:
+
+- 安定稼働
+- 定期バックアップ
+- 操作履歴管理
+- 大量利用者対応
+
+---
+
+## 7. バッチ・帳票要件
+
+Description:
+
+Describe scheduled processing and reporting requirements.
+
+Examples:
+
+- 日次レポート
+- 月次レポート
+- CSV出力
+- 定期処理
+
+---
+
+## 8. 特別要件
+
+Description:
+
+Describe any special business requirements.
+
+Examples:
+
+- 多言語対応
+- 承認フロー
+- 複数人作業
+- モバイル対応
+
+
+# Additional Sheet Optimizations
+
+Sheet2 Example:
+種別:
+- 画面
+- API
+- バッチ
+- 外部システム
+
+Sheet9 Example:
+種別:
+- バッチ
+- 帳票
+
+Sheet10 Categories:
+- セキュリティ
+- 性能
+- 可用性
+- バックアップ
+- 監視
+- 監査
+
+Rule:
+Prompt instructions = English
+User-visible labels/examples = Japanese
+Physical names = English

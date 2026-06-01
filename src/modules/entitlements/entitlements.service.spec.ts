@@ -1,3 +1,4 @@
+import { DocumentType } from '@prisma/client';
 import { EntitlementsService } from './entitlements.service';
 
 function createService() {
@@ -59,10 +60,22 @@ describe('EntitlementsService document credits', () => {
       entitlement: { update: jest.fn() },
     };
 
-    await service.consumeDocumentCredit(tx as any, 'user-1');
+    await service.consumeDocumentCredit(
+      tx as any,
+      'user-1',
+      DocumentType.BASIC_DESIGN,
+    );
 
     expect(tx.documentCredit.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ orderBy: { expiresAt: 'asc' } }),
+      expect.objectContaining({
+        orderBy: { expiresAt: 'asc' },
+        where: expect.objectContaining({
+          OR: expect.arrayContaining([
+            { source: 'business_pack' },
+            { source: 'single_document:BASIC_DESIGN' },
+          ]),
+        }),
+      }),
     );
     expect(tx.documentCredit.update).toHaveBeenCalledWith({
       where: { id: 'credit-1' },
