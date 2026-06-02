@@ -45,7 +45,7 @@ jobs:
         if: steps.deploy_secrets.outputs.ready == 'true'
         run: |
           ssh -i "$HOME/.ssh/tencent_cloud_key" -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" \
-            "sudo mkdir -p '$APP_ROOT' && sudo chown -R '$SERVER_USER:$SERVER_USER' '$APP_ROOT'"
+            "test -d '$APP_ROOT' && test -w '$APP_ROOT'"
           rsync -az --delete \
             -e "ssh -i $HOME/.ssh/tencent_cloud_key -p $SERVER_PORT" \
             --exclude '.git/' \
