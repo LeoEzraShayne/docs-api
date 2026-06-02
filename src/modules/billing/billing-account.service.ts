@@ -12,7 +12,7 @@ export class BillingAccountService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getAccountUsage(userId: string) {
-    const [user, entitlement, credits, grants] = await Promise.all([
+    const [user, entitlement, credits, grants, payments] = await Promise.all([
       this.prisma.user.findUnique({
         where: { id: userId },
         select: { email: true },
@@ -32,6 +32,10 @@ export class BillingAccountService {
             },
           },
         },
+      }),
+      this.prisma.payment.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
       }),
     ]);
     const now = new Date();
@@ -76,6 +80,54 @@ export class BillingAccountService {
       };
     });
     const nextExpiringDocument = minFutureDocument(documents, now);
+    const singlePayments = payments.filter(
+      (payment) =>
+        paymentKind(payment.metadata, payment.amountJpy) === 'single_document',
+    );
+    const singleCredits = credits.filter(
+      (credit) => credit.source !== 'business_pack',
+    );
+    const singleDocumentKeys = new Set(
+      singlePayments
+        .map((payment) => {
+          const documentId = paymentDocumentId(payment.metadata);
+          if (documentId) return `document:${documentId}`;
+          const projectId = paymentProjectId(payment.metadata);
+          const documentType = paymentDocumentType(payment.metadata);
+          return projectId && documentType
+            ? `project:${projectId}:${documentType}`
+            : null;
+        })
+        .filter((value): value is string => !!value),
+    );
+    const singleDocuments = documents.filter((document) => {
+      if (singleDocumentKeys.has(`document:${document.documentId}`))
+        return true;
+      return singleDocumentKeys.has(
+        `project:${document.projectId}:${document.documentType}`,
+      );
+    });
+    const singleDocumentPack =
+      singlePayments.length ||
+      singleCredits.some((credit) => credit.quantity > 0)
+        ? {
+            purchasedDocumentCount: singlePayments.length,
+            unstartedDocumentCredits: singleCredits
+              .filter((credit) => credit.expiresAt > now)
+              .reduce((sum, credit) => sum + credit.quantity, 0),
+            activeDocumentCount: singleDocuments.length,
+            nearestExpiresAt: minFutureDate(
+              [
+                ...singleCredits.map((credit) => credit.expiresAt),
+                ...singleDocuments
+                  .map((document) => document.expiresAt)
+                  .filter((date): date is Date => !!date),
+              ],
+              now,
+            ),
+            nextExpiringDocument: minFutureDocument(singleDocuments, now),
+          }
+        : undefined;
     const summary: AccountUsageSummary = {
       email: user?.email ?? '',
       planType: hasBusinessPack
@@ -83,6 +135,7 @@ export class BillingAccountService {
         : (entitlement?.planType ?? 'FREE'),
       hasBusinessPack,
       businessPack,
+      singleDocumentPack,
       nearestExpiresAt: minFutureDate(
         documents.map((item) => item.expiresAt).filter((date) => !!date),
         now,
@@ -90,8 +143,7 @@ export class BillingAccountService {
       nextExpiringDocument,
       needsPurchase: hasBusinessPack
         ? !businessPack || businessPack.status === '利用不可'
-        : documents.some((item) => item.status === '利用不可') ||
-          documents.length === 0,
+        : documents.some((item) => item.status === '利用不可'),
     };
     return { summary, documents };
   }
@@ -105,23 +157,10 @@ export class BillingAccountService {
     const pageSize = [10, 30, 50].includes(pageSizeInput ?? 10)
       ? (pageSizeInput ?? 10)
       : 10;
-    const [payments, grants] = await Promise.all([
-      this.prisma.payment.findMany({
-        where: { userId },
-        orderBy: { createdAt: 'desc' },
-      }),
-      this.prisma.documentGrant.findMany({
-        where: { userId },
-        orderBy: { updatedAt: 'desc' },
-        include: {
-          document: {
-            include: {
-              project: { select: { id: true, docTitle: true } },
-            },
-          },
-        },
-      }),
-    ]);
+    const payments = await this.prisma.payment.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
     const projectIds = Array.from(
       new Set(
         payments
@@ -138,60 +177,24 @@ export class BillingAccountService {
     const projectTitles = new Map(
       projects.map((project) => [project.id, project.docTitle]),
     );
-    const paidDocumentIds = new Set(
-      payments
-        .map((payment) => paymentDocumentId(payment.metadata))
-        .filter((value): value is string => !!value),
-    );
-    const paidProjectDocuments = new Set(
-      payments
-        .map((payment) => {
-          const projectId = paymentProjectId(payment.metadata);
-          const documentType = paymentDocumentType(payment.metadata);
-          return projectId && documentType ? `${projectId}:${documentType}` : null;
-        })
-        .filter((value): value is string => !!value),
-    );
-    const items = [
-      ...payments.map((payment) => {
-        const kind = paymentKind(payment.metadata, payment.amountJpy);
-        const documentType = paymentDocumentType(payment.metadata);
-        const projectId = paymentProjectId(payment.metadata);
-        return {
-          id: payment.id,
-          purchasedAt: payment.createdAt,
-          productName: productName(kind, documentType),
-          documentType,
-          documentTitle: documentType ? documentTitle(documentType) : null,
-          projectTitle: projectId ? (projectTitles.get(projectId) ?? null) : null,
-          amountJpy: payment.amountJpy,
-          status: payment.status,
-          grantedContent: grantedContent(kind),
-          stripeSessionId: payment.stripeSessionId,
-          stripeInvoiceId: payment.stripeInvoiceId,
-        };
-      }),
-      ...grants
-        .filter((grant) => {
-          if (paidDocumentIds.has(grant.documentId)) return false;
-          return !paidProjectDocuments.has(
-            `${grant.document.project.id}:${grant.documentType}`,
-          );
-        })
-        .map((grant) => ({
-          id: `grant_${grant.id}`,
-          purchasedAt: grant.updatedAt,
-          productName: 'Docs Single',
-          documentType: grant.documentType,
-          documentTitle: grant.document.title,
-          projectTitle: grant.document.project.docTitle,
-          amountJpy: 0,
-          status: 'applied',
-          grantedContent: '1文書枠を適用',
-          stripeSessionId: null,
-          stripeInvoiceId: null,
-        })),
-    ].sort((left, right) => right.purchasedAt.getTime() - left.purchasedAt.getTime());
+    const items = payments.map((payment) => {
+      const kind = paymentKind(payment.metadata, payment.amountJpy);
+      const documentType = paymentDocumentType(payment.metadata);
+      const projectId = paymentProjectId(payment.metadata);
+      return {
+        id: payment.id,
+        purchasedAt: payment.createdAt,
+        productName: productName(kind, documentType),
+        documentType,
+        documentTitle: documentType ? documentTitle(documentType) : null,
+        projectTitle: projectId ? (projectTitles.get(projectId) ?? null) : null,
+        amountJpy: payment.amountJpy,
+        status: payment.status,
+        grantedContent: grantedContent(kind),
+        stripeSessionId: payment.stripeSessionId,
+        stripeInvoiceId: payment.stripeInvoiceId,
+      };
+    });
     const total = items.length;
     return {
       items: items.slice((page - 1) * pageSize, page * pageSize),
@@ -274,7 +277,11 @@ function paymentKind(metadata: unknown, amountJpy: number) {
 }
 
 function paymentDocumentType(metadata: unknown) {
-  if (!metadata || typeof metadata !== 'object' || !('documentType' in metadata)) {
+  if (
+    !metadata ||
+    typeof metadata !== 'object' ||
+    !('documentType' in metadata)
+  ) {
     return null;
   }
   const raw = String((metadata as { documentType?: unknown }).documentType);
@@ -292,7 +299,11 @@ function paymentProjectId(metadata: unknown) {
 }
 
 function paymentDocumentId(metadata: unknown) {
-  if (!metadata || typeof metadata !== 'object' || !('documentId' in metadata)) {
+  if (
+    !metadata ||
+    typeof metadata !== 'object' ||
+    !('documentId' in metadata)
+  ) {
     return null;
   }
   const raw = String((metadata as { documentId?: unknown }).documentId);

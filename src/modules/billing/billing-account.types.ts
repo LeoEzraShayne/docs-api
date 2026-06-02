@@ -11,6 +11,16 @@ export type AccountUsageSummary = {
     expiresAt: Date | null;
     status: '利用中' | '利用不可';
   };
+  singleDocumentPack?: {
+    purchasedDocumentCount: number;
+    unstartedDocumentCredits: number;
+    activeDocumentCount: number;
+    nearestExpiresAt: Date | null;
+    nextExpiringDocument: {
+      documentTitle: string;
+      expiresAt: Date;
+    } | null;
+  };
   nearestExpiresAt: Date | null;
   nextExpiringDocument: {
     documentTitle: string;

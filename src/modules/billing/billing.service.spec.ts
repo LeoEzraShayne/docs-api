@@ -15,8 +15,12 @@ function createService(existingPayment: unknown = null) {
       findFirst: jest.fn(),
       update: jest.fn().mockResolvedValue({}),
     },
+    project: {
+      findFirst: jest.fn().mockResolvedValue({ id: 'project-1' }),
+    },
     document: {
       findFirst: jest.fn().mockResolvedValue({ id: 'doc-1' }),
+      upsert: jest.fn().mockResolvedValue({ id: 'doc-1' }),
     },
     documentGrant: {
       upsert: jest.fn().mockResolvedValue({ id: 'grant-1' }),
@@ -164,7 +168,26 @@ describe('BillingService webhook', () => {
 
     await service.confirmCheckoutSession('user-1', 'cs_2');
 
-    expect(prisma.document.findFirst).toHaveBeenCalledWith({
+    expect(prisma.project.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'project-1',
+        userId: 'user-1',
+      },
+      select: { id: true },
+    });
+    expect(prisma.document.upsert).toHaveBeenCalledWith({
+      where: {
+        projectId_type: { projectId: 'project-1', type: 'BASIC_DESIGN' },
+      },
+      create: {
+        projectId: 'project-1',
+        type: 'BASIC_DESIGN',
+        title: '基本設計書',
+      },
+      update: {},
+      select: { id: true },
+    });
+    expect(prisma.document.findFirst).not.toHaveBeenCalledWith({
       where: {
         projectId: 'project-1',
         type: 'BASIC_DESIGN',

@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DocumentType } from '@prisma/client';
+import { DocumentType, Prisma } from '@prisma/client';
 import { assertGenerationAccess, getOwnedProject } from './document-access';
 import { DOCUMENT_CONFIG } from './document-config';
 import { GenerateInput } from './document-generate.types';
@@ -20,6 +20,16 @@ import {
 import { saveDocumentVersion } from './document-version-writer';
 import { ExcelService } from '../generate/excel.service';
 import { PrismaService } from '../prisma/prisma.service';
+
+const DOCUMENT_WITH_RELATIONS = {
+  project: true,
+  versions: { orderBy: { versionNo: 'desc' as const } },
+  grants: true,
+} satisfies Prisma.DocumentInclude;
+
+type DocumentWithRelations = Prisma.DocumentGetPayload<{
+  include: typeof DOCUMENT_WITH_RELATIONS;
+}>;
 
 @Injectable()
 export class DocumentsService {
@@ -52,12 +62,10 @@ export class DocumentsService {
   }
 
   async get(userId: string, projectId: string, typeParam: string) {
+    const type = requireDocumentType(typeParam);
+    const document = await this.ensureDocument(userId, projectId, type);
     return toDocumentDto(
-      await this.ensureDocument(
-        userId,
-        projectId,
-        requireDocumentType(typeParam),
-      ),
+      await this.activateTypedSingleDocumentCredit(userId, document, type),
     );
   }
 
@@ -138,7 +146,8 @@ export class DocumentsService {
     const version = await this.prisma.documentVersion.findUnique({
       where: { documentId_versionNo: { documentId: document.id, versionNo } },
     });
-    if (!version) throw new NotFoundException('文書バージョンが見つかりません。');
+    if (!version)
+      throw new NotFoundException('文書バージョンが見つかりません。');
     const buffer = await this.excel.generateWorkbook({
       docTitle: document.title,
       documentType: document.type,
@@ -161,22 +170,68 @@ export class DocumentsService {
       where: { projectId_type: { projectId, type } },
       create: { projectId, type, title: DOCUMENT_CONFIG[type].title },
       update: {},
-      include: {
-        project: true,
-        versions: { orderBy: { versionNo: 'desc' } },
-        grants: true,
-      },
+      include: DOCUMENT_WITH_RELATIONS,
     });
+  }
+
+  private async activateTypedSingleDocumentCredit(
+    userId: string,
+    document: DocumentWithRelations,
+    type: DocumentType,
+  ) {
+    const now = new Date();
+    const activeGrant = document.grants.find(
+      (grant) =>
+        grant.userId === userId &&
+        grant.expiresAt > now &&
+        grant.remainingGenerations > 0,
+    );
+    if (activeGrant) return document;
+
+    const credit = await this.prisma.documentCredit.findFirst({
+      where: {
+        userId,
+        quantity: { gt: 0 },
+        expiresAt: { gt: now },
+        source: `single_document:${type}`,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!credit) return document;
+
+    const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    await this.prisma.$transaction([
+      this.prisma.documentCredit.update({
+        where: { id: credit.id },
+        data: { quantity: { decrement: 1 } },
+      }),
+      this.prisma.entitlement.update({
+        where: { userId },
+        data: { oneshotCredits: { decrement: 1 } },
+      }),
+      this.prisma.documentGrant.upsert({
+        where: { documentId: document.id },
+        create: {
+          userId,
+          documentId: document.id,
+          documentType: type,
+          remainingGenerations: 3,
+          expiresAt,
+        },
+        update: {
+          remainingGenerations: { increment: 3 },
+          expiresAt,
+        },
+      }),
+    ]);
+
+    return this.getDocumentById(document.id);
   }
 
   private async getDocumentById(id: string) {
     const document = await this.prisma.document.findUnique({
       where: { id },
-      include: {
-        project: true,
-        versions: { orderBy: { versionNo: 'desc' } },
-        grants: true,
-      },
+      include: DOCUMENT_WITH_RELATIONS,
     });
     if (!document) throw new NotFoundException('文書が見つかりません。');
     return document;

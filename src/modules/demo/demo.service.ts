@@ -21,6 +21,7 @@ export class DemoService {
       this.prisma.loginCode.count({
         where: {
           provider: 'EMAIL',
+          email: { startsWith: 'demo+' },
           ip,
           createdAt: { gte: minuteAgo },
         },
@@ -36,12 +37,14 @@ export class DemoService {
 
     if (recentMinute >= 1) {
       throw new TooManyRequestsException(
-        'しばらくしてから再度お試しください。',
+        'デモプレビューの表示回数が短時間に集中しています。1分後に再度お試しください。',
       );
     }
 
     if ((daily?.count ?? 0) >= 3) {
-      throw new TooManyRequestsException('本日のデモ利用上限に達しました。');
+      throw new TooManyRequestsException(
+        '本日のデモ利用上限に達しました。明日以降に再度お試しください。',
+      );
     }
 
     if (daily) {
