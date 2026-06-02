@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentType } from '@prisma/client';
 import Stripe from 'stripe';
@@ -19,6 +23,7 @@ export class BillingService {
     private readonly alertService: AlertService,
   ) {
     const stripeKey = this.configService.get<string>('STRIPE_SECRET_KEY');
+    this.assertStripeEnvironment(stripeKey);
     this.stripe = stripeKey
       ? new Stripe(stripeKey, { apiVersion: '2025-02-24.acacia' as never })
       : null;
@@ -220,6 +225,30 @@ export class BillingService {
 
   private frontendUrl() {
     return checkoutFrontendUrl(this.configService.get<string>('FRONTEND_URL'));
+  }
+
+  private assertStripeEnvironment(stripeKey?: string) {
+    if (this.configService.get<string>('NODE_ENV') !== 'production') return;
+
+    const webhookSecret = this.configService.get<string>(
+      'STRIPE_WEBHOOK_SECRET',
+    );
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL') ?? '';
+    if (!stripeKey || !stripeKey.startsWith('sk_live_')) {
+      throw new InternalServerErrorException(
+        '本番環境のStripe秘密鍵が正しく設定されていません。',
+      );
+    }
+    if (!webhookSecret || !webhookSecret.startsWith('whsec_')) {
+      throw new InternalServerErrorException(
+        '本番環境のStripe Webhook Secretが正しく設定されていません。',
+      );
+    }
+    if (!frontendUrl.startsWith('https://')) {
+      throw new InternalServerErrorException(
+        '本番環境のフロントエンドURLが正しく設定されていません。',
+      );
+    }
   }
 
   private async recordStubPayment(

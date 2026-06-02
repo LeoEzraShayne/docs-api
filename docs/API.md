@@ -688,7 +688,8 @@ Behavior
 - With Stripe configured, creates a one-time Checkout Session using `STRIPE_PRICE_SINGLE_DOCUMENT`.
 - Falls back to `STRIPE_PRICE_ONESHOT` for backward compatibility.
 - If no Stripe Price ID is configured, uses Checkout `price_data` with JPY 980.
-- Without Stripe configured, grants one stub single-document credit, records a stub payment history row, and returns a local success URL.
+- In non-production environments without Stripe configured, grants one stub single-document credit, records a stub payment history row, and returns a local success URL.
+- In production, `STRIPE_SECRET_KEY` must be a live key and `STRIPE_WEBHOOK_SECRET` must be configured.
 - `documentType` is written to Stripe Checkout metadata and later to purchase history.
 - A typed Docs Single credit can only start a grant for the selected document type. Business Pack credits can start any document type.
 
@@ -706,7 +707,8 @@ Behavior
 
 - With Stripe configured, creates a one-time Checkout Session using `STRIPE_PRICE_BUSINESS_PACK`.
 - If no Stripe Price ID is configured, uses Checkout `price_data` with JPY 66,640.
-- Without Stripe configured, grants 78 stub document credits, records a stub payment history row, and returns a local success URL.
+- In non-production environments without Stripe configured, grants 78 stub document credits, records a stub payment history row, and returns a local success URL.
+- In production, `STRIPE_SECRET_KEY` must be a live key and `STRIPE_WEBHOOK_SECRET` must be configured.
 
 Response
 
