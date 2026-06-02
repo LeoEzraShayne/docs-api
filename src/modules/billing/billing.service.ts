@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { DocumentType } from '@prisma/client';
 import Stripe from 'stripe';
 import { AlertService } from '../alert/alert.service';
+import { DOCUMENT_CONFIG } from '../documents/document-config';
 import { EntitlementsService } from '../entitlements/entitlements.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { checkoutFrontendUrl, stripeAmountToJpy } from './billing-utils';
@@ -439,12 +440,23 @@ export class BillingService {
     }
 
     if (projectId) {
-      return this.prisma.document.findFirst({
+      const project = await this.prisma.project.findFirst({
         where: {
+          id: projectId,
+          userId,
+        },
+        select: { id: true },
+      });
+      if (!project) return null;
+
+      return this.prisma.document.upsert({
+        where: { projectId_type: { projectId, type: documentType } },
+        create: {
           projectId,
           type: documentType,
-          project: { userId },
+          title: DOCUMENT_CONFIG[documentType].title,
         },
+        update: {},
         select: { id: true },
       });
     }

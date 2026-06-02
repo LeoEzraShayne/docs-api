@@ -38,6 +38,7 @@ export type PurchaseHistoryPage = {
     productName: string;
     documentType: DocumentType | null;
     documentTitle: string | null;
+    projectTitle: string | null;
     amountJpy: number;
     status: string;
     grantedContent: string;

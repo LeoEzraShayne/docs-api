@@ -6,9 +6,19 @@ import {
   Param,
   Post,
   Put,
+  Query,
   UseGuards,
 } from '@nestjs/common';
-import { IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
+import { Transform } from 'class-transformer';
+import {
+  IsIn,
+  IsInt,
+  IsObject,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import { CookieJwtGuard } from '../../common/cookie-jwt.guard';
 import { CurrentUser } from '../../common/current-user.decorator';
 import { ProjectsService } from './projects.service';
@@ -28,6 +38,20 @@ class UpsertProjectDto {
   minutesText?: string;
 }
 
+class ProjectListQuery {
+  @IsOptional()
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @IsIn([12, 24, 48])
+  pageSize?: number;
+}
+
 @Controller('projects')
 @UseGuards(CookieJwtGuard)
 export class ProjectsController {
@@ -39,8 +63,14 @@ export class ProjectsController {
   }
 
   @Get()
-  list(@CurrentUser() user: { userId: string }) {
-    return this.projectsService.list(user.userId);
+  list(
+    @CurrentUser() user: { userId: string },
+    @Query() query: ProjectListQuery,
+  ) {
+    if (!query.page && !query.pageSize) {
+      return this.projectsService.list(user.userId);
+    }
+    return this.projectsService.listPage(user.userId, query.page, query.pageSize);
   }
 
   @Get(':id')

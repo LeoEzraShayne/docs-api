@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PlanType, Prisma } from '@prisma/client';
+import { PlanType, Prisma, ProjectStatus } from '@prisma/client';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -60,6 +60,49 @@ export class ProjectsService {
         status: true,
       },
     });
+  }
+
+  async listPage(userId: string, pageInput?: number, pageSizeInput?: number) {
+    const page = Math.max(1, pageInput ?? 1);
+    const pageSize = [12, 24, 48].includes(pageSizeInput ?? 12)
+      ? (pageSizeInput ?? 12)
+      : 12;
+    const where = { userId };
+    const [items, total, readyCount, latest] = await Promise.all([
+      this.prisma.project.findMany({
+        where,
+        orderBy: { updatedAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        select: {
+          id: true,
+          docTitle: true,
+          updatedAt: true,
+          status: true,
+        },
+      }),
+      this.prisma.project.count({ where }),
+      this.prisma.project.count({
+        where: { ...where, status: ProjectStatus.READY },
+      }),
+      this.prisma.project.findFirst({
+        where,
+        orderBy: { updatedAt: 'desc' },
+        select: { updatedAt: true },
+      }),
+    ]);
+    return {
+      items,
+      page,
+      pageSize,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      summary: {
+        total,
+        readyCount,
+        latestUpdatedAt: latest?.updatedAt ?? null,
+      },
+    };
   }
 
   async getOwnedProject(userId: string, projectId: string) {

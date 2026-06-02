@@ -105,25 +105,65 @@ export class BillingAccountService {
     const pageSize = [10, 30, 50].includes(pageSizeInput ?? 10)
       ? (pageSizeInput ?? 10)
       : 10;
-    const [items, total] = await Promise.all([
+    const [payments, grants] = await Promise.all([
       this.prisma.payment.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * pageSize,
-        take: pageSize,
       }),
-      this.prisma.payment.count({ where: { userId } }),
+      this.prisma.documentGrant.findMany({
+        where: { userId },
+        orderBy: { updatedAt: 'desc' },
+        include: {
+          document: {
+            include: {
+              project: { select: { id: true, docTitle: true } },
+            },
+          },
+        },
+      }),
     ]);
-    return {
-      items: items.map((payment) => {
+    const projectIds = Array.from(
+      new Set(
+        payments
+          .map((payment) => paymentProjectId(payment.metadata))
+          .filter((value): value is string => !!value),
+      ),
+    );
+    const projects = projectIds.length
+      ? await this.prisma.project.findMany({
+          where: { userId, id: { in: projectIds } },
+          select: { id: true, docTitle: true },
+        })
+      : [];
+    const projectTitles = new Map(
+      projects.map((project) => [project.id, project.docTitle]),
+    );
+    const paidDocumentIds = new Set(
+      payments
+        .map((payment) => paymentDocumentId(payment.metadata))
+        .filter((value): value is string => !!value),
+    );
+    const paidProjectDocuments = new Set(
+      payments
+        .map((payment) => {
+          const projectId = paymentProjectId(payment.metadata);
+          const documentType = paymentDocumentType(payment.metadata);
+          return projectId && documentType ? `${projectId}:${documentType}` : null;
+        })
+        .filter((value): value is string => !!value),
+    );
+    const items = [
+      ...payments.map((payment) => {
         const kind = paymentKind(payment.metadata, payment.amountJpy);
         const documentType = paymentDocumentType(payment.metadata);
+        const projectId = paymentProjectId(payment.metadata);
         return {
           id: payment.id,
           purchasedAt: payment.createdAt,
           productName: productName(kind, documentType),
           documentType,
           documentTitle: documentType ? documentTitle(documentType) : null,
+          projectTitle: projectId ? (projectTitles.get(projectId) ?? null) : null,
           amountJpy: payment.amountJpy,
           status: payment.status,
           grantedContent: grantedContent(kind),
@@ -131,6 +171,30 @@ export class BillingAccountService {
           stripeInvoiceId: payment.stripeInvoiceId,
         };
       }),
+      ...grants
+        .filter((grant) => {
+          if (paidDocumentIds.has(grant.documentId)) return false;
+          return !paidProjectDocuments.has(
+            `${grant.document.project.id}:${grant.documentType}`,
+          );
+        })
+        .map((grant) => ({
+          id: `grant_${grant.id}`,
+          purchasedAt: grant.updatedAt,
+          productName: 'Docs Single',
+          documentType: grant.documentType,
+          documentTitle: grant.document.title,
+          projectTitle: grant.document.project.docTitle,
+          amountJpy: 0,
+          status: 'applied',
+          grantedContent: '1文書枠を適用',
+          stripeSessionId: null,
+          stripeInvoiceId: null,
+        })),
+    ].sort((left, right) => right.purchasedAt.getTime() - left.purchasedAt.getTime());
+    const total = items.length;
+    return {
+      items: items.slice((page - 1) * pageSize, page * pageSize),
       page,
       pageSize,
       total,
@@ -217,6 +281,22 @@ function paymentDocumentType(metadata: unknown) {
   return Object.values(DocumentType).includes(raw as DocumentType)
     ? (raw as DocumentType)
     : null;
+}
+
+function paymentProjectId(metadata: unknown) {
+  if (!metadata || typeof metadata !== 'object' || !('projectId' in metadata)) {
+    return null;
+  }
+  const raw = String((metadata as { projectId?: unknown }).projectId);
+  return raw || null;
+}
+
+function paymentDocumentId(metadata: unknown) {
+  if (!metadata || typeof metadata !== 'object' || !('documentId' in metadata)) {
+    return null;
+  }
+  const raw = String((metadata as { documentId?: unknown }).documentId);
+  return raw || null;
 }
 
 function productName(kind: string, _documentType: DocumentType | null) {
