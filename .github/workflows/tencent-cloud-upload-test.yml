@@ -54,3 +54,4 @@ jobs:
           ssh -i "$HOME/.ssh/tencent_cloud_key" "$SERVER_USER@$SERVER_HOST" "mkdir -p ~/$DEPLOY_DIR/${GITHUB_SHA}"
           scp -i "$HOME/.ssh/tencent_cloud_key" docs-api-build.tgz "$SERVER_USER@$SERVER_HOST:~/$DEPLOY_DIR/${GITHUB_SHA}/"
           ssh -i "$HOME/.ssh/tencent_cloud_key" "$SERVER_USER@$SERVER_HOST" "cd ~/$DEPLOY_DIR/${GITHUB_SHA} && tar -xzf docs-api-build.tgz && printf '%s\n' '${GITHUB_SHA}' > DEPLOYED_COMMIT && if [ -f ~/$DEPLOY_DIR/shared/.env.production ]; then ln -sfn ~/$DEPLOY_DIR/shared/.env.production .env.production; fi && npm ci && npx prisma generate && ln -sfn '${GITHUB_SHA}' ~/$DEPLOY_DIR/current && pm2 restart docs-api --update-env"
+          ssh -i "$HOME/.ssh/tencent_cloud_key" "$SERVER_USER@$SERVER_HOST" "cd ~/$DEPLOY_DIR && for release in */; do name=\${release%/}; if [ \"\$name\" != shared ] && [ \"\$name\" != '${GITHUB_SHA}' ]; then rm -rf -- \"\$name\"; fi; done"
