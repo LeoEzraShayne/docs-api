@@ -624,7 +624,7 @@ Response
       "documentTitle": "基本設計書",
       "amountJpy": 980,
       "status": "paid",
-      "grantedContent": "1文書",
+      "grantedContent": "3回生成",
       "stripeSessionId": "cs_live_xxx",
       "stripeInvoiceId": null
     }
@@ -639,7 +639,7 @@ Response
 Notes
 
 - `documentType` / `documentTitle` are set for Docs Single purchases made through the app checkout.
-- Business Pack returns `documentType: null`, `documentTitle: null`, and `grantedContent: "78文書枠"`.
+- Business Pack returns `documentType: null`, `documentTitle: null`, and `grantedContent: "78回生成"`.
 
 ### `GET /billing/portal`
 

@@ -98,6 +98,61 @@ export class EntitlementsService {
     return credit;
   }
 
+  async consumeSharedDocumentCredit(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    documentType: DocumentType,
+  ) {
+    const credit = await tx.documentCredit.findFirst({
+      where: {
+        userId,
+        quantity: { gt: 0 },
+        expiresAt: { gt: new Date() },
+        OR: [
+          { source: 'business_pack' },
+          { source: 'single_document' },
+          { source: `single_document:${documentType}` },
+        ],
+      },
+      orderBy: [{ source: 'asc' }, { expiresAt: 'asc' }],
+    });
+    if (!credit) return null;
+    await tx.documentCredit.update({
+      where: { id: credit.id },
+      data: { quantity: { decrement: 1 } },
+    });
+    await tx.entitlement.update({
+      where: { userId },
+      data: { oneshotCredits: { decrement: 1 } },
+    });
+    return credit;
+  }
+
+  async consumeBusinessPackCredit(
+    tx: Prisma.TransactionClient,
+    userId: string,
+  ) {
+    const credit = await tx.documentCredit.findFirst({
+      where: {
+        userId,
+        source: 'business_pack',
+        quantity: { gt: 0 },
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { expiresAt: 'asc' },
+    });
+    if (!credit) return null;
+    await tx.documentCredit.update({
+      where: { id: credit.id },
+      data: { quantity: { decrement: 1 } },
+    });
+    await tx.entitlement.update({
+      where: { userId },
+      data: { oneshotCredits: { decrement: 1 } },
+    });
+    return credit;
+  }
+
   async syncSubscription(
     userId: string,
     planType: keyof typeof SUBSCRIPTION_QUOTAS,

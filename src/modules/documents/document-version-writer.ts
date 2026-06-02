@@ -29,7 +29,12 @@ export function saveDocumentVersion(
 ) {
   return prisma.$transaction(async (tx) => {
     await grants.ensureGrant(tx, params.userId, params.documentId, params.type);
-    await grants.consumeGeneration(tx, params.documentId);
+    await grants.consumeGeneration(
+      tx,
+      params.userId,
+      params.documentId,
+      params.type,
+    );
     const latest = await tx.documentVersion.findFirst({
       where: { documentId: params.documentId },
       orderBy: { versionNo: 'desc' },

@@ -12,32 +12,36 @@ export class BillingAccountService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getAccountUsage(userId: string) {
-    const [user, entitlement, credits, grants, payments] = await Promise.all([
-      this.prisma.user.findUnique({
-        where: { id: userId },
-        select: { email: true },
-      }),
-      this.prisma.entitlement.findUnique({ where: { userId } }),
-      this.prisma.documentCredit.findMany({
-        where: { userId },
-        orderBy: { expiresAt: 'desc' },
-      }),
-      this.prisma.documentGrant.findMany({
-        where: { userId },
-        orderBy: { updatedAt: 'desc' },
-        include: {
-          document: {
-            include: {
-              project: { select: { id: true, docTitle: true } },
-            },
+    const [user, entitlement, credits, payments, accountDocuments] =
+      await Promise.all([
+        this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { email: true },
+        }),
+        this.prisma.entitlement.findUnique({ where: { userId } }),
+        this.prisma.documentCredit.findMany({
+          where: { userId },
+          orderBy: { expiresAt: 'desc' },
+        }),
+        this.prisma.payment.findMany({
+          where: { userId },
+          orderBy: { createdAt: 'desc' },
+        }),
+        this.prisma.document.findMany({
+          where: {
+            project: { userId },
+            OR: [
+              { currentVersion: { gt: 0 } },
+              { grants: { some: { userId } } },
+            ],
           },
-        },
-      }),
-      this.prisma.payment.findMany({
-        where: { userId },
-        orderBy: { createdAt: 'desc' },
-      }),
-    ]);
+          orderBy: { updatedAt: 'desc' },
+          include: {
+            project: { select: { id: true, docTitle: true } },
+            grants: { where: { userId } },
+          },
+        }),
+      ]);
     const now = new Date();
     const businessCredits = credits.filter(
       (item) => item.source === 'business_pack',
@@ -46,30 +50,44 @@ export class BillingAccountService {
       businessCredits.map((item) => item.expiresAt),
     );
     const hasBusinessPack = businessCredits.length > 0;
+    const generatedDocumentCount = accountDocuments.filter(
+      (document) => document.currentVersion > 0,
+    ).length;
     const businessPack = hasBusinessPack
       ? businessPackSummary(
           businessCredits,
-          grants.length,
+          generatedDocumentCount,
           businessExpiresAt,
           now,
         )
       : undefined;
-    const documents = grants.map<AccountDocumentUsage>((grant) => {
+    const singleDocumentCaps = singleDocumentGrantCaps(payments);
+    const documents = accountDocuments.map<AccountDocumentUsage>((document) => {
+      const grant = document.grants[0];
       const businessActive =
         hasBusinessPack && !!businessExpiresAt && businessExpiresAt > now;
-      const singleActive =
-        grant.expiresAt > now && grant.remainingGenerations > 0;
+      const singleActive = !!(
+        grant &&
+        grant.expiresAt > now &&
+        grant.remainingGenerations > 0
+      );
+      const dedicatedRemaining = Math.min(
+        Math.max(0, grant?.remainingGenerations ?? 0),
+        singleDocumentCaps[document.type] ?? 0,
+      );
       return {
-        projectId: grant.document.project.id,
-        projectTitle: grant.document.project.docTitle,
-        documentId: grant.documentId,
-        documentType: grant.documentType,
-        documentTitle: grant.document.title,
-        generationCount: grant.document.currentVersion,
+        projectId: document.project.id,
+        projectTitle: document.project.docTitle,
+        documentId: document.id,
+        documentType: document.type,
+        documentTitle: document.title,
+        generationCount: document.currentVersion,
         remainingGenerations: hasBusinessPack
-          ? undefined
-          : Math.max(0, grant.remainingGenerations),
-        expiresAt: hasBusinessPack ? businessExpiresAt : grant.expiresAt,
+          ? (businessPack?.unstartedDocumentCredits ?? 0) + dedicatedRemaining
+          : Math.max(0, grant?.remainingGenerations ?? 0),
+        expiresAt: hasBusinessPack
+          ? businessExpiresAt
+          : (grant?.expiresAt ?? null),
         status: hasBusinessPack
           ? businessActive
             ? '利用中'
@@ -82,8 +100,18 @@ export class BillingAccountService {
     const nextExpiringDocument = minFutureDocument(documents, now);
     const singlePayments = payments.filter(
       (payment) =>
+        payment.status === 'paid' &&
         paymentKind(payment.metadata, payment.amountJpy) === 'single_document',
     );
+    const singlePaymentDocuments = singlePayments.map((payment) => {
+      const documentType = paymentDocumentType(payment.metadata);
+      return {
+        documentTitle: documentType
+          ? documentTitle(documentType)
+          : 'Docs Single',
+        expiresAt: addDays(payment.createdAt, 7),
+      };
+    });
     const singleCredits = credits.filter(
       (credit) => credit.source !== 'business_pack',
     );
@@ -119,13 +147,17 @@ export class BillingAccountService {
             nearestExpiresAt: minFutureDate(
               [
                 ...singleCredits.map((credit) => credit.expiresAt),
+                ...singlePaymentDocuments.map((document) => document.expiresAt),
                 ...singleDocuments
                   .map((document) => document.expiresAt)
                   .filter((date): date is Date => !!date),
               ],
               now,
             ),
-            nextExpiringDocument: minFutureDocument(singleDocuments, now),
+            nextExpiringDocument: minFutureDocument(
+              [...singleDocuments, ...singlePaymentDocuments],
+              now,
+            ),
           }
         : undefined;
     const summary: AccountUsageSummary = {
@@ -231,6 +263,27 @@ function businessPackSummary(
   };
 }
 
+function singleDocumentGrantCaps(
+  payments: Array<{ metadata: unknown; amountJpy: number; status: string }>,
+) {
+  return payments.reduce<Partial<Record<DocumentType, number>>>(
+    (caps, payment) => {
+      const documentType = paymentDocumentType(payment.metadata);
+      if (
+        payment.status !== 'paid' ||
+        paymentKind(payment.metadata, payment.amountJpy) !==
+          'single_document' ||
+        !documentType
+      ) {
+        return caps;
+      }
+      caps[documentType] = (caps[documentType] ?? 0) + 3;
+      return caps;
+    },
+    {},
+  );
+}
+
 function maxDate(dates: Date[]) {
   if (!dates.length) return null;
   return dates.reduce((latest, date) => (date > latest ? date : latest));
@@ -244,7 +297,14 @@ function minFutureDate(dates: Date[], now: Date) {
   );
 }
 
-function minFutureDocument(documents: AccountDocumentUsage[], now: Date) {
+function addDays(date: Date, days: number) {
+  return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
+}
+
+function minFutureDocument(
+  documents: Array<{ documentTitle: string; expiresAt: Date | null }>,
+  now: Date,
+) {
   return documents
     .filter((document) => document.expiresAt && document.expiresAt > now)
     .reduce<{
@@ -316,7 +376,7 @@ function productName(kind: string, _documentType: DocumentType | null) {
 }
 
 function grantedContent(kind: string) {
-  return kind === 'business_pack' ? '78文書枠' : '1文書';
+  return kind === 'business_pack' ? '78回生成' : '3回生成';
 }
 
 function documentTitle(documentType: DocumentType) {

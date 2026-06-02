@@ -31,6 +31,12 @@ type DocumentWithRelations = Prisma.DocumentGetPayload<{
   include: typeof DOCUMENT_WITH_RELATIONS;
 }>;
 
+type BusinessPackPool = {
+  remainingGenerations: number;
+  expiresAt: Date | null;
+  singleDocumentGrantCaps: Partial<Record<DocumentType, number>>;
+};
+
 @Injectable()
 export class DocumentsService {
   constructor(
@@ -42,15 +48,23 @@ export class DocumentsService {
 
   async list(userId: string, projectId: string) {
     await getOwnedProject(this.prisma, userId, projectId);
-    const documents = await this.prisma.document.findMany({
-      where: { projectId },
-      include: {
-        versions: { orderBy: { versionNo: 'desc' }, take: 20 },
-        grants: true,
-      },
-      orderBy: { type: 'asc' },
-    });
-    return documents.map((document) => toDocumentDto(document));
+    const [documents, businessPackPool] = await Promise.all([
+      this.prisma.document.findMany({
+        where: { projectId },
+        include: {
+          project: true,
+          versions: { orderBy: { versionNo: 'desc' }, take: 20 },
+          grants: true,
+        },
+        orderBy: { type: 'asc' },
+      }),
+      this.getBusinessPackPool(userId),
+    ]);
+    return documents.map((document) =>
+      toDocumentDto(
+        this.withEffectiveGrant(userId, document, businessPackPool),
+      ),
+    );
   }
 
   async tree(userId: string, projectId: string) {
@@ -64,8 +78,17 @@ export class DocumentsService {
   async get(userId: string, projectId: string, typeParam: string) {
     const type = requireDocumentType(typeParam);
     const document = await this.ensureDocument(userId, projectId, type);
+    const activated = await this.activateTypedSingleDocumentCredit(
+      userId,
+      document,
+      type,
+    );
     return toDocumentDto(
-      await this.activateTypedSingleDocumentCredit(userId, document, type),
+      this.withEffectiveGrant(
+        userId,
+        activated,
+        await this.getBusinessPackPool(userId),
+      ),
     );
   }
 
@@ -82,7 +105,15 @@ export class DocumentsService {
         document.id,
         input.idempotencyKey,
       );
-      if (existing) return toVersionDto(document, existing);
+      if (existing)
+        return toVersionDto(
+          this.withEffectiveGrant(
+            userId,
+            document,
+            await this.getBusinessPackPool(userId),
+          ),
+          existing,
+        );
     }
     validateDocumentCooldown(document.lastGenerateAt);
     const sourceType = input.sourceType ?? defaultSource(type);
@@ -128,7 +159,14 @@ export class DocumentsService {
       extractedJson: output.sheets,
     });
     const updated = await this.getDocumentById(document.id);
-    return toVersionDto(updated, version);
+    return toVersionDto(
+      this.withEffectiveGrant(
+        userId,
+        updated,
+        await this.getBusinessPackPool(userId),
+      ),
+      version,
+    );
   }
 
   async download(
@@ -228,6 +266,94 @@ export class DocumentsService {
     return this.getDocumentById(document.id);
   }
 
+  private async getBusinessPackPool(userId: string): Promise<BusinessPackPool> {
+    const now = new Date();
+    const [credits, payments] = await Promise.all([
+      this.prisma.documentCredit.findMany({
+        where: {
+          userId,
+          source: 'business_pack',
+          quantity: { gt: 0 },
+          expiresAt: { gt: now },
+        },
+        orderBy: { expiresAt: 'asc' },
+      }),
+      this.prisma.payment.findMany({
+        where: {
+          userId,
+          status: 'paid',
+        },
+        select: { metadata: true },
+      }),
+    ]);
+
+    return {
+      remainingGenerations: credits.reduce(
+        (sum, credit) => sum + credit.quantity,
+        0,
+      ),
+      expiresAt: credits[0]?.expiresAt ?? null,
+      singleDocumentGrantCaps: payments.reduce<
+        Partial<Record<DocumentType, number>>
+      >((caps, payment) => {
+        const documentType = paymentDocumentType(payment.metadata);
+        if (
+          paymentKind(payment.metadata) !== 'single_document' ||
+          !documentType
+        ) {
+          return caps;
+        }
+        caps[documentType] = (caps[documentType] ?? 0) + 3;
+        return caps;
+      }, {}),
+    };
+  }
+
+  private withEffectiveGrant<
+    T extends {
+      type?: DocumentType;
+      grants?: Array<{
+        userId: string;
+        expiresAt: Date;
+        remainingGenerations: number;
+      }>;
+    },
+  >(userId: string, document: T, businessPackPool: BusinessPackPool) {
+    const now = new Date();
+    const dedicatedGrant = document.grants?.find(
+      (grant) =>
+        grant.userId === userId &&
+        grant.expiresAt > now &&
+        grant.remainingGenerations > 0,
+    );
+    const dedicatedRemaining = Math.min(
+      dedicatedGrant?.remainingGenerations ?? 0,
+      document.type
+        ? (businessPackPool.singleDocumentGrantCaps[document.type] ?? 0)
+        : 0,
+    );
+    const remainingGenerations =
+      businessPackPool.remainingGenerations + dedicatedRemaining;
+    if (remainingGenerations < 1) return { ...document, effectiveGrant: null };
+
+    const expiresAtCandidates = [
+      businessPackPool.expiresAt,
+      dedicatedGrant?.expiresAt,
+    ].filter((date): date is Date => !!date);
+    const expiresAt =
+      expiresAtCandidates.sort(
+        (left, right) => left.getTime() - right.getTime(),
+      )[0] ?? new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    return {
+      ...document,
+      effectiveGrant: {
+        remainingGenerations,
+        expiresAt,
+      },
+    };
+  }
+
   private async getDocumentById(id: string) {
     const document = await this.prisma.document.findUnique({
       where: { id },
@@ -242,4 +368,20 @@ export class DocumentsService {
       where: { documentId, idempotencyKey },
     });
   }
+}
+
+function paymentKind(metadata: unknown) {
+  if (!metadata || typeof metadata !== 'object') return undefined;
+  const kind = (metadata as { kind?: unknown }).kind;
+  return typeof kind === 'string' ? kind : undefined;
+}
+
+function paymentDocumentType(metadata: unknown) {
+  if (!metadata || typeof metadata !== 'object') return undefined;
+  const value = (metadata as { documentType?: unknown }).documentType;
+  return typeof value === 'string' && isDocumentType(value) ? value : undefined;
+}
+
+function isDocumentType(value: string): value is DocumentType {
+  return (Object.values(DocumentType) as string[]).includes(value);
 }

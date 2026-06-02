@@ -17,6 +17,7 @@ export function emptyDocumentNode(type: DocumentType) {
 
 export function toDocumentDto(document: {
   grants?: GrantView[];
+  effectiveGrant?: GrantView | null;
   versions: VersionView[];
   id: string;
   type: DocumentType;
@@ -28,7 +29,7 @@ export function toDocumentDto(document: {
     type: document.type,
     title: document.title,
     currentVersion: document.currentVersion,
-    grant: document.grants?.[0] ?? null,
+    grant: document.effectiveGrant ?? document.grants?.[0] ?? null,
     versions: document.versions,
   };
 }
@@ -40,6 +41,7 @@ export function toVersionDto(
     type: DocumentType;
     title: string;
     grants?: GrantView[];
+    effectiveGrant?: GrantView | null;
   },
   version: VersionView & { extractedJson: Prisma.JsonValue },
 ) {
