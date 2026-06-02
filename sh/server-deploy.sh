@@ -12,6 +12,11 @@ if [[ ! -f ".env.production" ]]; then
   exit 1
 fi
 
+set -a
+# shellcheck disable=SC1091
+source ".env.production"
+set +a
+
 npm ci
 npx prisma generate
 npx prisma migrate deploy
