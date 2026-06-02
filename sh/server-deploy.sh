@@ -17,7 +17,7 @@ set -a
 source ".env.production"
 set +a
 
-npm ci
+npm ci --include=dev
 npx prisma generate
 npx prisma migrate deploy
 npm run build
