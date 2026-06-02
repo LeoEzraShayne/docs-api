@@ -1,4 +1,4 @@
-name: Tencent Cloud upload test
+name: Deploy API to Tencent Cloud
 
 on:
   workflow_dispatch:
@@ -10,48 +10,57 @@ permissions:
   contents: read
 
 jobs:
-  upload:
+  deploy:
     runs-on: ubuntu-latest
     env:
-      DEPLOY_DIR: docs-api-deploy-test
+      SERVER_HOST: ${{ secrets.SERVER_HOST }}
+      SERVER_USER: ${{ secrets.SERVER_USER }}
+      SERVER_PORT: ${{ secrets.SERVER_PORT || '22' }}
+      SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+      APP_ROOT: /var/www/docs-api
     steps:
+      - name: Check deployment secrets
+        id: deploy_secrets
+        run: |
+          if [ -z "$SERVER_HOST" ] || [ -z "$SERVER_USER" ] || [ -z "$SERVER_SSH_KEY" ]; then
+            echo "Deployment secrets are not configured; skipping deploy."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Check out source
+        if: steps.deploy_secrets.outputs.ready == 'true'
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Build application
-        run: |
-          npm ci
-          npx prisma generate
-          npm run build
-        env:
-          DATABASE_URL: postgresql://build:build@localhost:5432/build
-
-      - name: Package build artifacts
-        run: |
-          tar -czf docs-api-build.tgz dist package.json package-lock.json prisma prisma.config.ts
-
-      - name: Configure SSH
-        env:
-          SERVER_HOST: ${{ secrets.SERVER_HOST }}
-          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+      - name: Prepare SSH
+        if: steps.deploy_secrets.outputs.ready == 'true'
         run: |
           install -d -m 700 "$HOME/.ssh"
           printf '%s\n' "$SERVER_SSH_KEY" > "$HOME/.ssh/tencent_cloud_key"
           chmod 600 "$HOME/.ssh/tencent_cloud_key"
-          ssh-keyscan -H "$SERVER_HOST" >> "$HOME/.ssh/known_hosts"
+          ssh-keyscan -p "$SERVER_PORT" -H "$SERVER_HOST" >> "$HOME/.ssh/known_hosts"
 
-      - name: Upload and activate build on Tencent Cloud
-        env:
-          SERVER_HOST: ${{ secrets.SERVER_HOST }}
-          SERVER_USER: ${{ secrets.SERVER_USER }}
+      - name: Sync source to Tencent Cloud
+        if: steps.deploy_secrets.outputs.ready == 'true'
         run: |
-          ssh -i "$HOME/.ssh/tencent_cloud_key" "$SERVER_USER@$SERVER_HOST" "mkdir -p ~/$DEPLOY_DIR/${GITHUB_SHA}"
-          scp -i "$HOME/.ssh/tencent_cloud_key" docs-api-build.tgz "$SERVER_USER@$SERVER_HOST:~/$DEPLOY_DIR/${GITHUB_SHA}/"
-          ssh -i "$HOME/.ssh/tencent_cloud_key" "$SERVER_USER@$SERVER_HOST" "cd ~/$DEPLOY_DIR/${GITHUB_SHA} && tar -xzf docs-api-build.tgz && printf '%s\n' '${GITHUB_SHA}' > DEPLOYED_COMMIT && if [ -f ~/$DEPLOY_DIR/shared/.env.production ]; then ln -sfn ~/$DEPLOY_DIR/shared/.env.production .env.production; fi && npm ci && npx prisma generate && ln -sfn '${GITHUB_SHA}' ~/$DEPLOY_DIR/current && pm2 restart docs-api --update-env"
-          ssh -i "$HOME/.ssh/tencent_cloud_key" "$SERVER_USER@$SERVER_HOST" "cd ~/$DEPLOY_DIR && for release in */; do name=\${release%/}; if [ \"\$name\" != shared ] && [ \"\$name\" != '${GITHUB_SHA}' ]; then rm -rf -- \"\$name\"; fi; done"
+          ssh -i "$HOME/.ssh/tencent_cloud_key" -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" \
+            "sudo mkdir -p '$APP_ROOT' && sudo chown -R '$SERVER_USER:$SERVER_USER' '$APP_ROOT'"
+          rsync -az --delete \
+            -e "ssh -i $HOME/.ssh/tencent_cloud_key -p $SERVER_PORT" \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            --exclude '.env' \
+            --exclude '.env.*' \
+            --exclude 'node_modules/' \
+            --exclude 'dist/' \
+            --exclude 'coverage/' \
+            --exclude '*.tsbuildinfo' \
+            --exclude '.DS_Store' \
+            ./ "$SERVER_USER@$SERVER_HOST:$APP_ROOT/"
+
+      - name: Build and restart on Tencent Cloud
+        if: steps.deploy_secrets.outputs.ready == 'true'
+        run: |
+          ssh -i "$HOME/.ssh/tencent_cloud_key" -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" \
+            "APP_ROOT='$APP_ROOT' GITHUB_SHA='$GITHUB_SHA' bash '$APP_ROOT/sh/server-deploy.sh'"
