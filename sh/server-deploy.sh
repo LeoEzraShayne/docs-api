@@ -25,6 +25,11 @@ npm prune --omit=dev
 
 printf '%s\n' "$COMMIT_SHA" > DEPLOYED_COMMIT
 
+# GitHub self-hosted runners terminate child processes that keep RUNNER_TRACKING_ID.
+# PM2-managed services must not inherit it, otherwise the runner may kill them
+# during post-job orphan cleanup.
+unset RUNNER_TRACKING_ID
+
 if pm2 describe "$APP_NAME" >/dev/null 2>&1; then
   pm2 delete "$APP_NAME"
 fi
