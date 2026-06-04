@@ -11,43 +11,18 @@ permissions:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, tencent-cloud, docs-api-prod]
     env:
-      SERVER_HOST: ${{ secrets.SERVER_HOST }}
-      SERVER_USER: ${{ secrets.SERVER_USER }}
-      SERVER_PORT: ${{ secrets.SERVER_PORT || '22' }}
-      SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
       APP_ROOT: /var/www/docs-api
     steps:
-      - name: Check deployment secrets
-        id: deploy_secrets
-        run: |
-          if [ -z "$SERVER_HOST" ] || [ -z "$SERVER_USER" ] || [ -z "$SERVER_SSH_KEY" ]; then
-            echo "Deployment secrets are not configured; skipping deploy."
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Check out source
-        if: steps.deploy_secrets.outputs.ready == 'true'
         uses: actions/checkout@v4
 
-      - name: Prepare SSH
-        if: steps.deploy_secrets.outputs.ready == 'true'
+      - name: Sync source on Tencent Cloud
         run: |
-          install -d -m 700 "$HOME/.ssh"
-          printf '%s\n' "$SERVER_SSH_KEY" > "$HOME/.ssh/tencent_cloud_key"
-          chmod 600 "$HOME/.ssh/tencent_cloud_key"
-          ssh-keyscan -p "$SERVER_PORT" -H "$SERVER_HOST" >> "$HOME/.ssh/known_hosts"
-
-      - name: Sync source to Tencent Cloud
-        if: steps.deploy_secrets.outputs.ready == 'true'
-        run: |
-          ssh -i "$HOME/.ssh/tencent_cloud_key" -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" \
-            "test -d '$APP_ROOT' && test -w '$APP_ROOT'"
+          test -d "$APP_ROOT"
+          test -w "$APP_ROOT"
           rsync -az --delete \
-            -e "ssh -i $HOME/.ssh/tencent_cloud_key -p $SERVER_PORT" \
             --exclude '.git/' \
             --exclude '.github/' \
             --exclude '.env' \
@@ -57,10 +32,18 @@ jobs:
             --exclude 'coverage/' \
             --exclude '*.tsbuildinfo' \
             --exclude '.DS_Store' \
-            ./ "$SERVER_USER@$SERVER_HOST:$APP_ROOT/"
+            ./ "$APP_ROOT/"
 
       - name: Build and restart on Tencent Cloud
-        if: steps.deploy_secrets.outputs.ready == 'true'
         run: |
-          ssh -i "$HOME/.ssh/tencent_cloud_key" -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" \
-            "APP_ROOT='$APP_ROOT' GITHUB_SHA='$GITHUB_SHA' bash '$APP_ROOT/sh/server-deploy.sh'"
+          APP_ROOT="$APP_ROOT" GITHUB_SHA="$GITHUB_SHA" bash "$APP_ROOT/sh/server-deploy.sh"
+
+      - name: Clean runner workspace
+        if: always()
+        run: |
+          if [ -n "${RUNNER_TEMP:-}" ] && [ -d "$RUNNER_TEMP" ]; then
+            find "$RUNNER_TEMP" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          fi
+          if [ -n "${GITHUB_WORKSPACE:-}" ] && [ -d "$GITHUB_WORKSPACE" ]; then
+            find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          fi
