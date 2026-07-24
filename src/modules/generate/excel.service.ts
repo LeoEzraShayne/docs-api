@@ -4,6 +4,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import ExcelJS from 'exceljs';
 import { DocumentType } from '@prisma/client';
 import { AlertService } from '../alert/alert.service';
+import { safeWorkbookName } from '../documents/document-catalog';
 import { DOCUMENT_CONFIG } from '../documents/document-config';
 
 @Injectable()
@@ -52,14 +53,16 @@ export class ExcelService {
           payload.requestId ? [payload.requestId] : [],
           error instanceof Error ? error.message : 'excel worker error',
         );
-        throw new ServiceUnavailableException('Excel生成サービスを利用できません。');
+        throw new ServiceUnavailableException(
+          'Excel生成サービスを利用できません。',
+        );
       }
     }
 
     const workbook = new ExcelJS.Workbook();
     const entries = this.orderedEntries(payload);
     for (const [sheetName, rows, columns] of entries) {
-      const sheet = workbook.addWorksheet(this.safeSheetName(sheetName));
+      const sheet = workbook.addWorksheet(safeWorkbookName(sheetName));
       let excelColumns = columns.map((key) => ({ header: key, key }));
 
       if (excelColumns.length === 0) {
@@ -98,10 +101,6 @@ export class ExcelService {
         payload.extractedJson[sheet.name] ?? [],
         sheet.columns,
       ]);
-  }
-
-  private safeSheetName(name: string) {
-    return name.replace(/[*?:\\/[\]]/g, '・').slice(0, 31);
   }
 
   async pingWorker() {

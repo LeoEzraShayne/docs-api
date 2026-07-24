@@ -2,14 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { TooManyRequestsException } from '../../common/too-many-requests.exception';
 import { getTokyoDateKey } from '../../common/tokyo-date';
 import { PrismaService } from '../prisma/prisma.service';
-import { LlmService } from '../generate/llm.service';
 import { redactPreviewTabs } from '../generate/redaction';
+import { RequirementsPreviewGeneratorService } from '../documents/requirements-preview-generator.service';
 
 @Injectable()
 export class DemoService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly llmService: LlmService,
+    private readonly requirementsPreview: RequirementsPreviewGeneratorService,
   ) {}
 
   async preview(ip: string) {
@@ -73,8 +73,9 @@ export class DemoService {
       },
     });
 
-    const tabs = await this.llmService.extractRequirements(
+    const tabs = await this.requirementsPreview.generate(
       {
+        id: 'demo',
         docTitle: 'Demo Project',
         formFields: {
           industry: 'SaaS',
@@ -90,6 +91,7 @@ export class DemoService {
     return {
       project: { id: 'demo', docTitle: 'Demo Project' },
       versionNo: 1,
+      schema: 'requirements-v2' as const,
       tabs: redactPreviewTabs(tabs),
       paywall: { canExport: false, remaining: 0 },
     };

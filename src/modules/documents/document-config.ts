@@ -1,18 +1,19 @@
 import { DocumentSourceType, DocumentType } from '@prisma/client';
 
 export type SheetSpec = { name: string; columns: string[] };
-type Config = {
+export type GenerationMode = 'standard' | 'simple' | 'custom';
+export type DocumentConfig = {
   title: string;
   filename: string;
   sources: DocumentSourceType[];
-  modes: Array<'standard' | 'simple' | 'custom'>;
+  modes: GenerationMode[];
   simpleSheets?: string[];
   sheets: SheetSpec[];
 };
 
 const execCols = ['実施者', '実施日', '備考'];
 
-export const DOCUMENT_CONFIG: Record<DocumentType, Config> = {
+export const DOCUMENT_CONFIG: Record<DocumentType, DocumentConfig> = {
   REQUIREMENTS: {
     title: '要件定義書',
     filename: '要件定義書.xlsx',

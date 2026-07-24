@@ -4,7 +4,7 @@ import {
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { Prisma, ProjectStatus } from '@prisma/client';
+import { DocumentType, Prisma, ProjectStatus } from '@prisma/client';
 import type { RequestWithMeta } from '../../common/request-id.middleware';
 import { getTokyoDateKey } from '../../common/tokyo-date';
 import { TooManyRequestsException } from '../../common/too-many-requests.exception';
@@ -12,9 +12,13 @@ import { AlertService } from '../alert/alert.service';
 import { EntitlementsService } from '../entitlements/entitlements.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectsService } from '../projects/projects.service';
+import { RequirementsPreviewGeneratorService } from '../documents/requirements-preview-generator.service';
 import { ExcelService } from './excel.service';
-import { LlmService } from './llm.service';
-import { redactPreviewTabs } from './redaction';
+import {
+  detectPreviewSchema,
+  emptyRequirementsTabs,
+  redactPreviewTabs,
+} from './redaction';
 
 @Injectable()
 export class GenerateService {
@@ -23,7 +27,7 @@ export class GenerateService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly projectsService: ProjectsService,
-    private readonly llmService: LlmService,
+    private readonly requirementsPreview: RequirementsPreviewGeneratorService,
     private readonly excelService: ExcelService,
     private readonly entitlementsService: EntitlementsService,
     private readonly alertService: AlertService,
@@ -40,7 +44,10 @@ export class GenerateService {
       requestId?: string;
     },
   ) {
-    const project = await this.projectsService.getOwnedProject(userId, projectId);
+    const project = await this.projectsService.getOwnedProject(
+      userId,
+      projectId,
+    );
     const now = new Date();
 
     if (
@@ -68,14 +75,8 @@ export class GenerateService {
       return {
         project: { id: project.id, docTitle: project.docTitle },
         versionNo: 0,
-        tabs: {
-          flow: [],
-          screens: [],
-          functions: [],
-          nfr: [],
-          risks_issues: [],
-          glossary: [],
-        },
+        schema: 'requirements-v2' as const,
+        tabs: emptyRequirementsTabs(),
         paywall: exportAbility,
       };
     }
@@ -89,10 +90,14 @@ export class GenerateService {
       });
 
       if (existing) {
-        const tabs = existing.extractedJson as Record<string, Record<string, unknown>[]>;
+        const tabs = existing.extractedJson as Record<
+          string,
+          Record<string, unknown>[]
+        >;
         return {
           project: { id: project.id, docTitle: project.docTitle },
           versionNo: existing.versionNo,
+          schema: detectPreviewSchema(tabs),
           tabs,
           paywall: exportAbility,
         };
@@ -102,8 +107,9 @@ export class GenerateService {
     const llmStartedAt = Date.now();
     let tabs: Record<string, Record<string, unknown>[]>;
     try {
-      tabs = await this.llmService.extractRequirements(
+      tabs = await this.requirementsPreview.generate(
         {
+          id: project.id,
           docTitle: project.docTitle,
           formFields: (project.formFields as Record<string, unknown>) ?? {},
           minutesText: project.minutesText,
@@ -189,6 +195,7 @@ export class GenerateService {
     return {
       project: { id: project.id, docTitle: project.docTitle },
       versionNo: version.versionNo,
+      schema: 'requirements-v2' as const,
       tabs: input.mode === 'preview' ? redactPreviewTabs(tabs) : tabs,
       paywall: {
         canExport: input.mode === 'export' ? !!exportAbility?.canExport : false,
@@ -206,7 +213,10 @@ export class GenerateService {
     versionNo: number,
     request: Pick<RequestWithMeta, 'requestId'>,
   ) {
-    const project = await this.projectsService.getOwnedProject(userId, projectId);
+    const project = await this.projectsService.getOwnedProject(
+      userId,
+      projectId,
+    );
     const version = await this.prisma.projectVersion.findUnique({
       where: {
         projectId_versionNo: {
@@ -231,12 +241,17 @@ export class GenerateService {
 
     const excelStartedAt = Date.now();
     try {
+      const tabs = version.extractedJson as Record<
+        string,
+        Record<string, unknown>[]
+      >;
       const buffer = await this.excelService.generateWorkbook({
         docTitle: project.docTitle ?? '要件定義',
-        extractedJson: version.extractedJson as Record<
-          string,
-          Record<string, unknown>[]
-        >,
+        extractedJson: tabs,
+        documentType:
+          detectPreviewSchema(tabs) === 'requirements-v2'
+            ? DocumentType.REQUIREMENTS
+            : undefined,
         requestId: request.requestId,
       });
 
@@ -279,7 +294,9 @@ export class GenerateService {
     });
 
     if ((usage?.count ?? 0) >= 1) {
-      throw new TooManyRequestsException('本日の無料プレビュー上限に達しました。');
+      throw new TooManyRequestsException(
+        '本日の無料プレビュー上限に達しました。',
+      );
     }
 
     const [projectCount, entitlement] = await Promise.all([

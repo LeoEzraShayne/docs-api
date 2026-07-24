@@ -7,6 +7,7 @@ import {
 import { PlanType, Prisma, ProjectStatus } from '@prisma/client';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
+import { detectPreviewSchema, redactPreviewTabs } from '../generate/redaction';
 
 type UpsertProjectInput = {
   docTitle?: string;
@@ -156,6 +157,11 @@ export class ProjectsService {
       throw new NotFoundException('バージョンが見つかりません。');
     }
 
+    const tabs = version.extractedJson as Record<
+      string,
+      Record<string, unknown>[]
+    >;
+    const schema = detectPreviewSchema(tabs);
     return {
       project: {
         id: project.id,
@@ -163,7 +169,8 @@ export class ProjectsService {
       },
       versionNo: version.versionNo,
       quality: version.quality,
-      tabs: version.extractedJson,
+      schema,
+      tabs: schema === 'requirements-v2' ? redactPreviewTabs(tabs) : tabs,
     };
   }
 
