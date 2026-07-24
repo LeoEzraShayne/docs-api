@@ -20,7 +20,7 @@ async function bootstrap() {
   );
   await app.listen(process.env.PORT ?? 3000);
 }
-bootstrap();
+void bootstrap();
 
 function allowedOrigins() {
   const configured = (process.env.FRONTEND_URL ?? 'http://localhost:3000')

@@ -216,7 +216,7 @@ export class BillingAccountService {
       return {
         id: payment.id,
         purchasedAt: payment.createdAt,
-        productName: productName(kind, documentType),
+        productName: productName(kind),
         documentType,
         documentTitle: documentType ? documentTitle(documentType) : null,
         projectTitle: projectId ? (projectTitles.get(projectId) ?? null) : null,
@@ -370,7 +370,7 @@ function paymentDocumentId(metadata: unknown) {
   return raw || null;
 }
 
-function productName(kind: string, _documentType: DocumentType | null) {
+function productName(kind: string) {
   if (kind === 'business_pack') return 'Business Pack';
   return 'Docs Single';
 }

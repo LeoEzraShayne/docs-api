@@ -58,7 +58,10 @@ export class ProjectsController {
   constructor(private readonly projectsService: ProjectsService) {}
 
   @Post()
-  create(@CurrentUser() user: { userId: string }, @Body() body: UpsertProjectDto) {
+  create(
+    @CurrentUser() user: { userId: string },
+    @Body() body: UpsertProjectDto,
+  ) {
     return this.projectsService.create(user.userId, body);
   }
 
@@ -70,7 +73,11 @@ export class ProjectsController {
     if (!query.page && !query.pageSize) {
       return this.projectsService.list(user.userId);
     }
-    return this.projectsService.listPage(user.userId, query.page, query.pageSize);
+    return this.projectsService.listPage(
+      user.userId,
+      query.page,
+      query.pageSize,
+    );
   }
 
   @Get(':id')

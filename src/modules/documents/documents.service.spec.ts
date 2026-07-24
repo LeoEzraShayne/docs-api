@@ -182,7 +182,6 @@ describe('DocumentsService', () => {
       expect.anything(),
       'user-1',
       'doc-1',
-      DocumentType.REQUIREMENTS,
     );
     expect(prisma.project.update).toHaveBeenCalledWith({
       where: { id: 'project-1' },

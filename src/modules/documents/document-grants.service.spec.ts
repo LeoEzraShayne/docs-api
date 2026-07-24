@@ -83,7 +83,6 @@ describe('DocumentGrantsService', () => {
         }),
         'user-1',
         'doc-1',
-        DocumentType.REQUIREMENTS,
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
   });

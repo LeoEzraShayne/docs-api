@@ -60,7 +60,6 @@ export class DocumentGrantsService {
     tx: Prisma.TransactionClient,
     userId: string,
     documentId: string,
-    documentType: DocumentType,
   ) {
     const now = new Date();
     const grant = await tx.documentGrant.findUnique({ where: { documentId } });

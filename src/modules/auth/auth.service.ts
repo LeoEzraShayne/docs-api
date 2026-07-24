@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { OAuth2Client } from 'google-auth-library';
+import { OAuth2Client, type LoginTicket } from 'google-auth-library';
 import { Resend } from 'resend';
 import {
   VERIFY_CODE_EMAIL_SUBJECT,
@@ -172,7 +172,7 @@ export class AuthService {
       throw new BadRequestException('Googleログイン設定が不足しています。');
     }
 
-    let ticket;
+    let ticket: LoginTicket;
     try {
       ticket = await this.googleClient.verifyIdToken({
         idToken,
@@ -206,7 +206,8 @@ export class AuthService {
     return this.jwtService.sign(
       { sub: userId, email },
       {
-        secret: this.configService.get<string>('JWT_SECRET') ?? 'docs-dev-secret',
+        secret:
+          this.configService.get<string>('JWT_SECRET') ?? 'docs-dev-secret',
         expiresIn: '30d',
       },
     );

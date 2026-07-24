@@ -22,7 +22,14 @@ export class CookieJwtGuard implements CanActivate {
 
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest<RequestWithMeta>();
-    const token = req.cookies?.auth_token;
+    const cookies: unknown = req.cookies;
+    const token =
+      cookies &&
+      typeof cookies === 'object' &&
+      'auth_token' in cookies &&
+      typeof cookies.auth_token === 'string'
+        ? cookies.auth_token
+        : undefined;
 
     if (!token) {
       throw new UnauthorizedException('ログインが必要です。');
@@ -30,7 +37,8 @@ export class CookieJwtGuard implements CanActivate {
 
     try {
       const payload = this.jwtService.verify<JwtPayload>(token, {
-        secret: this.configService.get<string>('JWT_SECRET') ?? 'docs-dev-secret',
+        secret:
+          this.configService.get<string>('JWT_SECRET') ?? 'docs-dev-secret',
       });
 
       req.user = {

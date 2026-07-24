@@ -49,7 +49,10 @@ export class DocumentPromptService {
     specs: SheetSpec[],
     input: Input,
   ): DocumentOutput {
-    const title = String(input.project.docTitle ?? DOCUMENT_CONFIG[type].title);
+    const title = stringValue(
+      input.project.docTitle,
+      DOCUMENT_CONFIG[type].title,
+    );
     return {
       sheets: Object.fromEntries(
         specs.map((spec) => [
@@ -101,6 +104,12 @@ export class DocumentPromptService {
       column.includes('概要')
     )
       return `${title}の${sheet}`;
-    return String(input.inputJson[column] ?? `${sheet} ${column}`);
+    return stringValue(input.inputJson[column], `${sheet} ${column}`);
   }
+}
+
+function stringValue(value: unknown, fallback: string) {
+  return typeof value === 'string' || typeof value === 'number'
+    ? String(value)
+    : fallback;
 }

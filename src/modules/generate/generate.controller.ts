@@ -9,7 +9,7 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
-import { IsIn, IsOptional, IsString } from 'class-validator';
+import { IsIn } from 'class-validator';
 import type { Response } from 'express';
 import { CookieJwtGuard } from '../../common/cookie-jwt.guard';
 import { CurrentUser } from '../../common/current-user.decorator';

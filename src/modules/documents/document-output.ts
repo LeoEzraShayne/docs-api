@@ -13,14 +13,21 @@ export function selectSheets(
   selected?: string[],
 ) {
   const config = DOCUMENT_CONFIG[type];
-  if (mode && !config.modes.includes(mode as 'standard' | 'simple' | 'custom')) {
+  if (
+    mode &&
+    !config.modes.includes(mode as 'standard' | 'simple' | 'custom')
+  ) {
     throw new BadRequestException('生成モードが正しくありません。');
   }
   if (mode === 'simple') return config.simpleSheets ?? sheetNames(type);
   if (mode === 'custom') {
     if (!selected?.length)
-      throw new BadRequestException('少なくとも1つのシートを選択してください。');
-    const invalid = selected.filter((sheet) => !sheetNames(type).includes(sheet));
+      throw new BadRequestException(
+        '少なくとも1つのシートを選択してください。',
+      );
+    const invalid = selected.filter(
+      (sheet) => !sheetNames(type).includes(sheet),
+    );
     if (invalid.length)
       throw new BadRequestException(
         `選択できないシートが含まれています: ${invalid.join(', ')}`,
@@ -42,7 +49,10 @@ export function normalizeDocumentOutput(
 
   return {
     sheets: Object.fromEntries(
-      specs.map((spec) => [spec.name, normalizeRows(spec, parsed.sheets[spec.name])]),
+      specs.map((spec) => [
+        spec.name,
+        normalizeRows(spec, parsed.sheets[spec.name]),
+      ]),
     ),
     metadata: parsed.metadata ?? {},
   };

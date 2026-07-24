@@ -1,4 +1,8 @@
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { DocumentSourceType, DocumentType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -39,7 +43,10 @@ export async function resolveSourceVersion(
   });
   if (!version)
     throw new NotFoundException('上流文書バージョンが見つかりません。');
-  if (version.document.project.userId !== userId || version.document.projectId !== projectId) {
+  if (
+    version.document.project.userId !== userId ||
+    version.document.projectId !== projectId
+  ) {
     throw new ForbiddenException('上流文書がこの案件に属していません。');
   }
   if (version.document.type !== requiredType) {
@@ -47,5 +54,9 @@ export async function resolveSourceVersion(
       `上流文書は ${requiredType} である必要があります。`,
     );
   }
-  return { documentType: version.document.type, versionNo: version.versionNo, data: version.extractedJson };
+  return {
+    documentType: version.document.type,
+    versionNo: version.versionNo,
+    data: version.extractedJson,
+  };
 }

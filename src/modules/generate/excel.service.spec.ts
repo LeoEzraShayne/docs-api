@@ -40,7 +40,7 @@ describe('ExcelService', () => {
       '業務シナリオテスト',
     ]);
     expect(sheet.getRow(1).values).toEqual([
-      ,
+      undefined,
       'No',
       'シナリオ名',
       '関連機能',
@@ -67,7 +67,12 @@ describe('ExcelService', () => {
       extractedJson: { 項目概要: [{ No: 1, 項目: '目的', 内容: '内容' }] },
     });
 
-    const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    const requestBody = fetchMock.mock.calls[0][1]?.body;
+    expect(typeof requestBody).toBe('string');
+    if (typeof requestBody !== 'string') {
+      throw new Error('Excel worker request body must be JSON text');
+    }
+    const body = JSON.parse(requestBody);
     expect(fetchMock.mock.calls[0][0]).toBe('https://excel.example/generate');
     expect(body).toMatchObject({
       docTitle: '案件',

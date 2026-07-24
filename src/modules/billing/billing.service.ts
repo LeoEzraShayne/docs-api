@@ -172,12 +172,12 @@ export class BillingService {
       );
 
       if (event.type === 'checkout.session.completed') {
-        const session = event.data.object as Stripe.Checkout.Session;
+        const session = event.data.object;
         await this.processCheckoutSession(session, event.id);
       }
 
       if (event.type === 'invoice.paid') {
-        const invoice = event.data.object as Stripe.Invoice;
+        const invoice = event.data.object;
         const subscriptionId =
           typeof invoice.parent?.subscription_details?.subscription === 'string'
             ? invoice.parent.subscription_details.subscription
@@ -517,7 +517,7 @@ function normalizeDocumentType(
   throwOnInvalid = true,
 ): DocumentType | undefined {
   if (!value) return undefined;
-  const raw = String(value);
+  const raw = typeof value === 'string' ? value : '';
   if (Object.values(DocumentType).includes(raw as DocumentType)) {
     return raw as DocumentType;
   }
