@@ -1,0 +1,42 @@
+name: Check document catalog drift
+
+on:
+  schedule:
+    - cron: "17 18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: [self-hosted, linux, x64, tencent-cloud, docs-api-prod]
+    env:
+      APP_ROOT: /var/www/docs-api
+    steps:
+      - name: Check out docs-web snapshot and checker
+        uses: actions/checkout@v4
+        with:
+          repository: LeoEzraShayne/docs-web
+          ref: main
+          path: docs-web
+
+      - name: Compare production contract with docs-web snapshot
+        working-directory: docs-web
+        run: |
+          test -f "$APP_ROOT/.env.production"
+          set -a
+          source "$APP_ROOT/.env.production"
+          set +a
+          export DOCUMENT_CATALOG_URL="http://127.0.0.1:${PORT:-3002}/document-catalog/v1"
+          node scripts/sync-document-catalog.mjs --check
+
+      - name: Clean runner workspace
+        if: always()
+        run: |
+          if [ -n "${RUNNER_TEMP:-}" ] && [ -d "$RUNNER_TEMP" ]; then
+            find "$RUNNER_TEMP" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          fi
+          if [ -n "${GITHUB_WORKSPACE:-}" ] && [ -d "$GITHUB_WORKSPACE" ]; then
+            find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+          fi
