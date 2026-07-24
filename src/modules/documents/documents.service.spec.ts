@@ -62,6 +62,10 @@ function createService(documentOverrides: Record<string, unknown> = {}) {
     },
     documentCredit: {
       findFirst: jest.fn().mockResolvedValue({ id: 'credit-1' }),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+    payment: {
+      findMany: jest.fn().mockResolvedValue([]),
     },
     $transaction: jest.fn(async (callback: any) =>
       callback({
@@ -69,6 +73,7 @@ function createService(documentOverrides: Record<string, unknown> = {}) {
         documentVersion: prisma.documentVersion,
         document: prisma.document,
         project: prisma.project,
+        documentCredit: prisma.documentCredit,
       }),
     ),
   } as any;
@@ -175,7 +180,9 @@ describe('DocumentsService', () => {
     );
     expect(grants.consumeGeneration).toHaveBeenCalledWith(
       expect.anything(),
+      'user-1',
       'doc-1',
+      DocumentType.REQUIREMENTS,
     );
     expect(prisma.project.update).toHaveBeenCalledWith({
       where: { id: 'project-1' },

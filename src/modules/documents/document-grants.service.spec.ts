@@ -12,12 +12,19 @@ function txWithGrant(grant: unknown) {
       update: jest.fn().mockResolvedValue({}),
       upsert: jest.fn().mockResolvedValue({ id: 'grant-1' }),
     },
+    documentCredit: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      update: jest.fn().mockResolvedValue({}),
+    },
+    entitlement: {
+      update: jest.fn().mockResolvedValue({}),
+    },
   } as any;
 }
 
 describe('DocumentGrantsService', () => {
   it('reuses an active grant without consuming a new document credit', async () => {
-    const entitlements = { consumeDocumentCredit: jest.fn() };
+    const entitlements = { consumeBusinessPackCredit: jest.fn() };
     const service = new DocumentGrantsService(entitlements as any);
     const active = {
       id: 'grant-1',
@@ -34,25 +41,29 @@ describe('DocumentGrantsService', () => {
         DocumentType.REQUIREMENTS,
       ),
     ).resolves.toBe(active);
-    expect(entitlements.consumeDocumentCredit).not.toHaveBeenCalled();
+    expect(entitlements.consumeBusinessPackCredit).not.toHaveBeenCalled();
   });
 
   it('starts a new 3-generation window when the previous grant expired', async () => {
-    const entitlements = { consumeDocumentCredit: jest.fn() };
+    const entitlements = { consumeBusinessPackCredit: jest.fn() };
     const service = new DocumentGrantsService(entitlements as any);
     const tx = txWithGrant({
       userId: 'user-1',
       expiresAt: past(),
       remainingGenerations: 1,
     });
+    tx.documentCredit.findFirst.mockResolvedValue({ id: 'credit-1' });
 
     await service.ensureGrant(tx, 'user-1', 'doc-1', DocumentType.REQUIREMENTS);
 
-    expect(entitlements.consumeDocumentCredit).toHaveBeenCalledWith(
-      tx,
-      'user-1',
-      DocumentType.REQUIREMENTS,
-    );
+    expect(tx.documentCredit.update).toHaveBeenCalledWith({
+      where: { id: 'credit-1' },
+      data: { quantity: { decrement: 1 } },
+    });
+    expect(tx.entitlement.update).toHaveBeenCalledWith({
+      where: { userId: 'user-1' },
+      data: { oneshotCredits: { decrement: 1 } },
+    });
     expect(tx.documentGrant.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         update: expect.objectContaining({ remainingGenerations: 3 }),
@@ -70,7 +81,9 @@ describe('DocumentGrantsService', () => {
           expiresAt: future(),
           remainingGenerations: 0,
         }),
+        'user-1',
         'doc-1',
+        DocumentType.REQUIREMENTS,
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
